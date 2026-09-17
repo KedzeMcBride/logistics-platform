@@ -1,0 +1,28 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+.next
+dist
+build
+out
+coverage
+.turbo
+
+# Lockfiles (managed by pnpm)
+pnpm-lock.yaml
+
+# Generated
+packages/database/prisma/generated
+*.min.js
+*.min.css
+
+# Env
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+.idea
+.vscode
