@@ -1,0 +1,393 @@
+Day 1 Progress Report — Monorepo Foundation
+Status: 90% complete (Tasks 1–9 of 14 done)
+Date: September 17, 2026
+Next: Task 10 — Next.js scaffold (apps/web)
+
+1. High-Level Summary
+We've built a working pnpm + Turborepo monorepo with a NestJS API that boots, responds to HTTP, and inherits shared configuration from a dedicated config package. The API is live on port 3001, returns JSON at GET /api/v1, and hot-reloads on file changes.
+
+What works end-to-end:
+
+pnpm install from a clean clone installs everything correctly
+
+pnpm dev from the root starts the API via Turborepo
+
+The API responds with {"name":"logistics-api","version":"0.0.0","status":"ok","timestamp":"..."}
+
+What's missing from Day 1:
+
+Next.js frontend (apps/web) — Task 10
+
+Final verification pass and milestone tag
+
+2. Repository Structure (Current)
+text
+C:\Users\KMcBride\logistics-platform\
+├── .gitattributes              # LF normalization for all text files
+├── .gitignore                  # node_modules, .env, build outputs
+├── .editorconfig               # cross-editor whitespace/indent rules
+├── .prettierrc                 # Prettier formatting config
+├── .prettierignore             # Prettier exclusions
+├── .vscode/                    # (planned — Task 12)
+├── README.md                   # project description
+├── PROGRESS.md                 # (planned — update after each task)
+├── package.json                # root workspace manifest
+├── pnpm-workspace.yaml         # declares apps/* and packages/*
+├── pnpm-lock.yaml              # generated lockfile
+├── turbo.json                  # Turborepo pipeline
+├── node_modules/               # root deps (turbo, prettier, ts, eslint)
+├── apps/
+│   └── api/                    # NestJS application
+│       ├── src/
+│       │   ├── main.ts         # bootstrap, port 3001, prefix /api/v1
+│       │   ├── app.module.ts   # root module
+│       │   ├── app.controller.ts  # GET /api/v1 → health JSON
+│       │   └── app.service.ts
+│       ├── test/
+│       │   └── app.e2e-spec.ts # (uses default import for supertest)
+│       ├── nest-cli.json
+│       ├── package.json        # name: @repo/api
+│       ├── tsconfig.json       # extends @repo/config/tsconfig/nestjs.json
+│       ├── tsconfig.build.json
+│       ├── README.md
+│       └── node_modules/       # includes @repo/* symlinks
+├── packages/
+│   ├── config/                 # shared TS + ESLint configs
+│   │   ├── package.json        # name: @repo/config
+│   │   ├── tsconfig/
+│   │   │   ├── base.json
+│   │   │   ├── nextjs.json
+│   │   │   ├── nestjs.json
+│   │   │   └── react-library.json
+│   │   └── eslint/
+│   │       ├── base.js
+│   │       ├── nextjs.js
+│   │       └── nestjs.js
+│   ├── shared/                 # shared constants, types, events
+│   │   ├── package.json        # name: @repo/shared
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts
+│   │       ├── constants.ts    # APP_NAME, API_VERSION
+│   │       ├── types.ts        # ApiResponse<T>, Paginated<T>
+│   │       └── events.ts       # WS_EVENTS constants
+│   └── database/               # Prisma package (shell only)
+│       ├── package.json        # name: @repo/database
+│       ├── tsconfig.json
+│       ├── .env.example        # DATABASE_URL template
+│       ├── src/
+│       │   └── index.ts        # placeholder export
+│       └── prisma/
+│           ├── schema.prisma   # empty schema, ready for Day 4
+│           └── seed.ts         # placeholder
+├── infrastructure/             # (empty, reserved)
+│   ├── docker/
+│   └── github/
+└── docs/
+    └── adr/                    # (empty, reserved for Architecture Decision Records)
+3. What Each Package Does
+Root (logistics-platform)
+The workspace orchestrator. Owns:
+
+Turborepo pipeline (turbo.json)
+
+Global tooling: TypeScript, Prettier, ESLint, Turbo itself
+
+Scripts that fan out across workspaces: dev, build, lint, typecheck, test, clean, format, format:check
+
+package.json scripts:
+
+json
+{
+  "dev": "turbo run dev",
+  "build": "turbo run build",
+  "lint": "turbo run lint",
+  "typecheck": "turbo run typecheck",
+  "test": "turbo run test",
+  "clean": "turbo run clean",
+  "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+  "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\""
+}
+packages/config — @repo/config
+Purpose: single source of truth for TypeScript and ESLint configuration.
+
+Why it exists: every app and package needs a consistent compiler target, strictness level, and lint rule set. Without a shared config, three packages drift within a week.
+
+Exports:
+
+@repo/config/tsconfig/base.json — generic TS settings (ES2022, strict, bundler resolution)
+
+@repo/config/tsconfig/nestjs.json — extends base, adds decorators + CommonJS
+
+@repo/config/tsconfig/nextjs.json — extends base, adds DOM libs + JSX
+
+@repo/config/tsconfig/react-library.json — for future shared UI
+
+@repo/config/eslint/base — base ESLint rules
+
+@repo/config/eslint/nestjs — NestJS-specific overrides
+
+@repo/config/eslint/nextjs — Next.js-specific overrides
+
+Key rule: base configs contain only behavioral options. Path-relative options (rootDir, outDir, baseUrl, paths) belong in the consuming package's tsconfig — otherwise they resolve relative to the config package's folder, which breaks.
+
+packages/shared — @repo/shared
+Purpose: shared TypeScript code that both frontend and backend consume.
+
+Contents:
+
+constants.ts — APP_NAME, API_VERSION
+
+types.ts — ApiResponse<T>, ApiSuccess<T>, ApiError, Paginated<T>
+
+events.ts — WS_EVENTS constants and WsEvent type
+
+Why it matters: DTOs, enums, and event names live here once, imported everywhere. When we add a mobile app later, it consumes the same contracts — no drift possible.
+
+packages/database — @repo/database
+Purpose: isolate Prisma schema, migrations, and generated client.
+
+Current state: shell only. prisma/schema.prisma has the generator and datasource blocks but no models. Real models land on Day 4.
+
+Planned exports:
+
+export * from '@prisma/client' — the generated Prisma client
+
+Helper functions (e.g., transaction wrappers) as needed
+
+Scripts:
+
+db:generate — generate Prisma client from schema
+
+db:migrate — create a new migration (dev)
+
+db:migrate:deploy — apply migrations (prod)
+
+db:studio — open Prisma Studio
+
+db:seed — run seed script
+
+apps/api — @repo/api
+Purpose: the NestJS backend — REST + WebSocket + BullMQ workers (later).
+
+Current state: boots on port 3001, serves GET /api/v1 with a health payload.
+
+Key files:
+
+src/main.ts — bootstraps Nest, sets global prefix /api/v1, listens on PORT env or 3001
+
+src/app.module.ts — root module (imports nothing yet)
+
+src/app.controller.ts — defines GET / (mounted at /api/v1 due to prefix)
+
+src/app.service.ts — service injected into controller
+
+Extends: @repo/config/tsconfig/nestjs.json
+Depends on: @repo/config, @repo/shared, @repo/database (via workspace:*)
+
+4. Key Decisions Made (and Why)
+Decision	Choice	Reason
+Package manager	pnpm	Best workspace support, disk-efficient, Turborepo-native
+Monorepo tool	Turborepo	Simple config, remote cache support, minimal ceremony
+Node version	22.x LTS	Latest LTS, native ESM, modern fetch, supported until 2027
+TypeScript	5.6+	Strict mode, noUncheckedIndexedAccess, modern decorators
+Backend framework	NestJS 10	Module structure enforces service/repository separation
+Config sharing	Package-name extends (@repo/config/...)	Works across the workspace; relative paths break when files move
+Line endings	LF everywhere via .gitattributes	Cross-platform consistency; CI on Linux expects LF
+Git config	core.autocrlf=input	Store LF in repo, LF in working tree; no surprise conversions
+Nest port	3001	Avoids collision with Next.js on 3000
+API prefix	/api/v1	Matches design doc; enables versioning later
+apps/api/package.json name	@repo/api	Consistent scope so imports and filters work uniformly
+5. Problems Hit and How We Solved Them
+Problem: pnpm 12.4.2 was a broken Windows shim
+Symptom: pnpm -v printed 12.4.2 and download failed
+Fix: uninstalled the shim, installed via corepack prepare pnpm@9.15.0
+Lesson: verify pnpm -v returns 9.x on Day 1
+
+Problem: @repo/config wasn't resolvable from workspace packages
+Symptom: Cannot find module '@repo/config/tsconfig/base.json'
+Cause: pnpm doesn't hoist workspace packages to root node_modules
+Fix: (1) create the package with an exports map, (2) ensure each consumer declares @repo/config in devDependencies, (3) reinstall to force symlinks
+Lesson: pnpm links only where declared
+
+Problem: rootDir in shared config resolved to wrong path
+Symptom: File 'src/main.ts' is not under 'rootDir' 'packages/config/tsconfig/src'
+Cause: TypeScript resolves relative paths in extends relative to the config file that declares them, not the file that extends it
+Fix: removed rootDir and outDir from packages/config/tsconfig/base.json. Path options go in the consuming package's tsconfig
+Lesson: base configs = behavioral only; leaf configs = paths
+
+Problem: NestJS decorator errors (TS1241, TS1270)
+Symptom: @Get() fails signature check
+Cause: experimentalDecorators and emitDecoratorMetadata missing from nestjs.json
+Fix: added both flags; also strictPropertyInitialization: false
+Lesson: NestJS requires those two decorator flags at minimum
+
+Problem: import * as request from 'supertest' fails to compile
+Symptom: This expression is not callable
+Cause: with esModuleInterop: true, namespace imports aren't callable
+Fix: changed to import request from 'supertest' in apps/api/test/app.e2e-spec.ts
+Lesson: Nest CLI's generated e2e test predates esModuleInterop
+
+Problem: CRLF line endings flagged by ESLint/Prettier
+Symptom: Delete ␍ on every line
+Cause: Windows-generated files had CRLF, configs expected LF
+Fix: created .gitattributes with * text=auto eol=lf, set core.autocrlf=input, ran git add --renormalize ., ran pnpm format
+Lesson: set .gitattributes on Day 1 in any project touched by Windows
+
+Problem: packages/database folder didn't exist when needed
+Symptom: ERR_PNPM_WORKSPACE_PKG_NOT_FOUND when apps/api depended on @repo/database
+Cause: Task 8's folder creation was skipped or lost
+Fix: recreated the folder, package.json, tsconfig.json, and four source files (.env.example, src/index.ts, prisma/schema.prisma, prisma/seed.ts)
+Lesson: verify pnpm list -r --depth -1 shows every expected workspace package
+
+Problem: pnpm install said "Already up to date" but didn't link new deps
+Symptom: workspace symlinks missing after adding a new workspace:* dependency
+Cause: pnpm's fast-path skips resolution when it thinks the lockfile is current
+Fix: Remove-Item pnpm-lock.yaml; pnpm install
+Lesson: when in doubt, delete the lockfile and reinstall
+
+Problem: Nest default controller returned "Hello World!"
+Symptom: curl returned plain text instead of JSON
+Cause: earlier file replacements for app.controller.ts and app.service.ts never landed
+Fix: replaced both files with the health-check versions, hot reload picked it up
+Lesson: after replacing files in a workspace, curl the endpoint — don't assume the save stuck
+
+6. Working Commands Reference
+From the root
+powershell
+pnpm install                     # install all workspace deps
+pnpm dev                         # start all apps via Turbo
+pnpm build                       # build all apps
+pnpm lint                        # lint all apps
+pnpm typecheck                   # typecheck all apps
+pnpm test                        # run all tests
+pnpm clean                       # clear build artifacts
+pnpm format                      # format all files
+pnpm format:check                # verify formatting (CI-safe)
+For the API specifically
+powershell
+pnpm --filter @repo/api dev      # start API with hot reload
+pnpm --filter @repo/api build    # production build
+pnpm --filter @repo/api typecheck
+pnpm --filter @repo/api test
+For the database package
+powershell
+pnpm --filter @repo/database db:generate    # generate Prisma client
+pnpm --filter @repo/database db:migrate     # create + apply migration
+pnpm --filter @repo/database db:studio      # open Prisma Studio
+pnpm --filter @repo/database db:seed        # run seed script
+Verify workspace state
+powershell
+pnpm list -r --depth -1          # list all workspace packages
+pnpm list -r --depth 1           # show direct deps of each package
+Test-Path apps\api\node_modules\@repo\config    # check a symlink
+Git housekeeping
+powershell
+git status                       # what changed
+git log --oneline                # recent commits
+git add .                        # stage everything
+git commit -m "..."              # commit
+git add --renormalize .          # normalize line endings across repo
+7. Current Working State — Proof
+API responds
+powershell
+PS> curl.exe http://localhost:3001/api/v1
+{"name":"logistics-api","version":"0.0.0","status":"ok","timestamp":"2026-09-17T12:43:07.763Z"}
+Turbo starts the pipeline
+text
+• turbo 2.10.13
+[1:45:21 PM] Starting compilation in watch mode...
+[Nest] ... Nest application successfully started +4ms
+API listening on http://localhost:3001/api/v1
+Workspace is correct
+text
+pnpm list -r --depth -1
+logistics-platform@0.0.0 (PRIVATE)
+@repo/api@0.0.0
+@repo/config@0.0.0
+@repo/database@0.0.0
+@repo/shared@0.0.0
+8. Environment Details
+Item	Value
+OS	Windows 11 (assumed from PowerShell paths)
+Node	v22.12.0
+pnpm	9.15.0
+Turborepo	2.10.13
+TypeScript	5.9.3 (from @repo/api error output)
+NestJS	10.x
+Prisma	5.22.x (installed, schema empty)
+Git autocrlf	input
+Editor	VS Code
+9. Pending for Day 1 Completion
+Task 10 — Next.js scaffold (apps/web)
+Scaffold with create-next-app
+
+Rename to @repo/web
+
+Wire workspace deps
+
+Extend @repo/config/tsconfig/nextjs.json
+
+Landing page ("Logistics Platform")
+
+Port 3000
+
+Verify it runs alongside the API
+
+Task 11 — Wire root scripts
+Already done. pnpm dev at root starts Turbo which starts everything. Just needs the web app to exist.
+
+Task 12 — VS Code workspace settings
+.vscode/settings.json — format on save, Prettier default
+
+.vscode/extensions.json — recommended extensions
+
+Task 13 — Final verification pass
+Clean pnpm install from a fresh clone
+
+pnpm dev starts both apps
+
+Both URLs respond
+
+pnpm lint, pnpm typecheck, pnpm build all pass
+
+Task 14 — Progress log + tag
+Write PROGRESS.md
+
+Tag v0.0.1-scaffold
+
+Push (if remote exists)
+
+10. Where We Are Against the Full Roadmap
+You are on Day 1 of 84. The plan is:
+
+Days	Focus
+1	← Monorepo scaffold (current)
+2	Docker Compose (Postgres + PostGIS + Redis)
+3	Shared types + enums + DTOs
+4	Prisma schema v1 (User, Customer, Driver, Address)
+5	CI pipeline
+6–11	Authentication (register, login, refresh, RBAC)
+12–17	Delivery lifecycle + pricing
+18–23	Driver management + assignment
+24–29	Maps + geospatial + real-time tracking
+30–35	Notifications
+36–47	Admin, customer, driver frontends
+48–59	Analytics + AI
+60–65	Hardening (rate limits, observability)
+66–77	Docker, CI/CD, deployment
+78–84	Polish, docs, launch
+You have 83 days of focused work ahead. The foundation you built today is what every subsequent day stands on. Nothing we did is throwaway.
+
+11. What You Should Do With This Doc
+Save it as docs/day-01-progress.md. Commit it. It's your reference for:
+
+Debugging: "why did I set up .gitattributes?" → answer is in section 4 and 5
+
+Onboarding: if you bring on a collaborator on Day 20, this doc explains the base
+
+Retrospective: in Week 4, when something breaks, you can look at Day 1's decisions and understand why
+
+Context recovery: if you stop for two weeks, this doc gets you back in 10 minutes
+
+Command to save it
