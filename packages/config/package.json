@@ -1,0 +1,25 @@
+{
+  "name": "@repo/config",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "tsconfig",
+    "eslint"
+  ],
+  "exports": {
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/nextjs.json": "./tsconfig/nextjs.json",
+    "./tsconfig/nestjs.json": "./tsconfig/nestjs.json",
+    "./tsconfig/react-library.json": "./tsconfig/react-library.json",
+    "./eslint/base": "./eslint/base.js",
+    "./eslint/nextjs": "./eslint/nextjs.js",
+    "./eslint/nestjs": "./eslint/nestjs.js"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0"
+  }
+}
