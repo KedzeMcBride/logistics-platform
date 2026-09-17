@@ -1,0 +1,11 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Real models land on Day 4.
+// This file exists so `pnpm db:generate` runs cleanly today.
