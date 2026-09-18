@@ -2,19 +2,43 @@
   "name": "@repo/shared",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./constants": "./src/constants.ts",
-    "./types": "./src/types.ts",
-    "./events": "./src/events.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "default": "./dist/constants.js"
+    },
+    "./enums": {
+      "types": "./dist/enums/index.d.ts",
+      "default": "./dist/enums/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "default": "./dist/events/index.js"
+    },
+    "./validation": {
+      "types": "./dist/validation/index.d.ts",
+      "default": "./dist/validation/index.js"
+    }
   },
   "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "clean": "Remove-Item -Recurse -Force .turbo,dist -ErrorAction SilentlyContinue"
+    "clean": "rimraf .turbo dist"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@repo/config": "workspace:*",

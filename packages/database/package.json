@@ -15,7 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "clean": "Remove-Item -Recurse -Force .turbo,dist -ErrorAction SilentlyContinue"
+    "clean": "rimraf .turbo dist"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

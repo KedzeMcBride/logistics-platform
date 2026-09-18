@@ -1,6 +1,7 @@
 # Logistics & Delivery Management Platform
 # starting the backend api curl.exe http://localhost:3001/api/v1
 # starting the webapp pnpm --filter @repo/web dev
+# staring the docker container for postgres and redis docker start logistics-postgres logistics-redis
 
 A real-time logistics and delivery platform with live tracking, driver assignment,
 admin operations, and AI-assisted dispatch.
