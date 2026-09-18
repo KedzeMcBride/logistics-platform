@@ -161,6 +161,7 @@
 ## Day 5 — CI Pipeline ✅ COMPLETE
 
 ### Completed
+
 - [x] `.github/workflows/ci.yml` runs on push + PR
 - [x] Service containers: postgis/postgis:16-3.4, redis:7-alpine
 - [x] PostGIS extension enabled in CI Postgres
@@ -171,6 +172,7 @@
 - [x] Full green pipeline verified
 
 ### Architecture Decisions
+
 - `pnpm/action-setup` reads version from `packageManager` in root `package.json`
 - Explicit `pnpm --filter @repo/shared build` before monorepo build guarantees `dist/` exists in CI
 - `--force` on lint and build to bypass Turbo cache while stabilizing
@@ -178,6 +180,7 @@
 - `turbo.json` lint task inputs include `.eslintrc*` so config changes bust the cache
 
 ### Problems Solved
+
 - pnpm version mismatch → rely on `packageManager` field
 - `import/no-unresolved` on `@repo/shared` in CI → removed import plugin from extends
 - Turbo cached stale lint results → added inputs to lint task, used `--force`
@@ -187,6 +190,7 @@
 - README Prettier failure in CI but not locally → resolved with clean config; debug step removed
 
 ## Day 6 — Authentication (NEXT)
+
 - [ ] AuthModule: register, login, refresh, logout
 - [ ] bcryptjs password hashing
 - [ ] JWT access + refresh tokens with rotation
