@@ -8,13 +8,7 @@ module.exports = {
     tsconfigRootDir: __dirname,
   },
   plugins: ['@typescript-eslint', 'import'],
-  extends: [
-    'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:import/recommended',
-    'plugin:import/typescript',
-    'prettier',
-  ],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
   env: {
     node: true,
     jest: true,
@@ -22,6 +16,9 @@ module.exports = {
   ignorePatterns: ['.eslintrc.js', 'dist', 'node_modules', 'coverage'],
   rules: {
     'import/no-unresolved': 'off',
+    'import/named': 'off',
+    'import/default': 'off',
+    'import/namespace': 'off',
     '@typescript-eslint/no-unused-vars': [
       'warn',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

@@ -11,8 +11,12 @@
       "persistent": true,
       "dependsOn": ["^build"]
     },
-    "lint": {},
-    "typecheck": {},
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.js", ".eslintrc.json", "eslint.config.js"]
+    },
+    "typecheck": {
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"]
+    },
     "test": {
       "dependsOn": ["^build"]
     },
