@@ -199,3 +199,46 @@
 - [ ] `@CurrentUser()` decorator
 - [ ] `GET /users/me`, `PATCH /users/me`
 - [ ] Integration tests
+
+## Day 6 — Authentication ✅ COMPLETE
+
+### Completed
+
+- [x] POST /api/v1/auth/register — customer or driver, creates profile
+- [x] POST /api/v1/auth/login — bcryptjs verification
+- [x] POST /api/v1/auth/refresh — rotates tokens in same family
+- [x] POST /api/v1/auth/logout — revokes refresh token
+- [x] GET /api/v1/users/me — returns user + profile
+- [x] PATCH /api/v1/users/me — updates phone, fullName, avatarUrl
+- [x] JwtAuthGuard, RolesGuard, @CurrentUser() decorator
+- [x] Refresh token reuse detection (family revocation)
+- [x] Global ValidationPipe
+- [x] Integration tests: 7/7 passing
+
+### Architecture Decisions
+
+- Access tokens: 15m JWT, stateless
+- Refresh tokens: 30d opaque, SHA256-hashed in DB
+- Family-based rotation: reuse revokes entire family
+- Passport JWT strategy fetches user on every request
+- bcryptjs cost factor 10
+- Only CUSTOMER and DRIVER self-register
+- `apps/api/.env.test` committed for test env; `.env` gitignored
+- Turbo `globalEnv` declared for DATABASE_URL, REDIS_URL, JWT_* so tasks receive them
+
+### Problems Solved
+
+- NestJS v12 packages incompatible with v10 → pinned to v11/v10
+- @types/passport-jwt missing → added
+- JwtModuleOptions expiresIn type strict → cast to StringValue from ms
+- dto/index.ts wrong re-export path
+- Jest globals not found → added "types": ["node", "jest"] to tsconfig
+- Test couldn't find DATABASE_URL in CI → turbo globalEnv + .env.test file
+
+## Day 7 — Customer Frontend Foundation (NEXT)
+
+- [ ] API client with auth interceptors
+- [ ] Auth context (register/login/logout/refresh)
+- [ ] Login and register pages
+- [ ] Protected route middleware
+- [ ] `/dashboard` placeholder
