@@ -29,22 +29,23 @@ enum DriverAvailability {
 // =============================================================================
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  phone        String?   @unique
-  passwordHash String
-  role         Role
-  isActive     Boolean   @default(true)
-  isSuspended  Boolean   @default(false)
+  id              String    @id @default(uuid())
+  email           String    @unique
+  phone           String?   @unique
+  passwordHash    String
+  role            Role
+  isActive        Boolean   @default(true)
+  isSuspended     Boolean   @default(false)
   emailVerifiedAt DateTime?
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   customerProfile CustomerProfile?
   driverProfile   DriverProfile?
   addresses       Address[]
   refreshTokens   RefreshToken[]
+  notifications   Notification[]
   auditLogs       AuditLog[]        @relation("ActorAuditLogs")
 
   @@index([role])
@@ -52,14 +53,14 @@ model User {
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String
-  familyId   String
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([familyId])
@@ -86,7 +87,7 @@ model DriverProfile {
   fullName        String
   avatarUrl       String?
   availability    DriverAvailability @default(OFFLINE)
-  approvalStatus  String             @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvalStatus  String             @default("PENDING")
   rating          Decimal            @default(5.0) @db.Decimal(3, 2)
   totalDeliveries Int                @default(0)
   currentLat      Float?
@@ -95,8 +96,8 @@ model DriverProfile {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  vehicles   Vehicle[]
-  documents  DriverDocument[]
+  vehicles  Vehicle[]
+  documents DriverDocument[]
 
   @@index([availability])
   @@index([approvalStatus])
@@ -106,7 +107,7 @@ model Vehicle {
   id          String        @id @default(uuid())
   driverId    String
   driver      DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  type        String // BIKE | CAR | VAN | TRUCK
+  type        String
   plateNumber String
   capacityKg  Float?
   isActive    Boolean       @default(true)
@@ -119,9 +120,9 @@ model DriverDocument {
   id         String        @id @default(uuid())
   driverId   String
   driver     DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  type       String // LICENSE | ID | INSURANCE | VEHICLE_REGISTRATION
+  type       String
   fileUrl    String
-  status     String        @default("PENDING") // PENDING | APPROVED | REJECTED
+  status     String        @default("PENDING")
   reviewedBy String?
   reviewedAt DateTime?
   createdAt  DateTime      @default(now())
@@ -135,9 +136,9 @@ model DriverDocument {
 // =============================================================================
 
 model Address {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   label     String?
   line1     String
   city      String
@@ -145,12 +146,34 @@ model Address {
   country   String
   lat       Float
   lng       Float
-  isDefault Boolean  @default(false)
+  isDefault Boolean   @default(false)
   deletedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([userId, isDefault])
+}
+
+// =============================================================================
+// NOTIFICATIONS
+// =============================================================================
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  data      Json?
+  channel   String    @default("IN_APP")
+  status    String    @default("PENDING")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 // =============================================================================

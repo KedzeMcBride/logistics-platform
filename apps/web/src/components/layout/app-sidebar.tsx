@@ -4,18 +4,20 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bell, LayoutDashboard, Package, User, type LucideIcon } from 'lucide-react';
 
+import { UnreadBadge } from '@/features/notifications';
 import { cn } from '@/lib/utils';
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  showBadge?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/deliveries', label: 'Deliveries', icon: Package },
-  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/notifications', label: 'Notifications', icon: Bell, showBadge: true },
   { href: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -45,6 +47,7 @@ export function AppSidebar() {
                 strokeWidth={isActive ? 2.25 : 2}
               />
               <span>{item.label}</span>
+              {item.showBadge && <UnreadBadge />}
             </Link>
           );
         })}

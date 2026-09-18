@@ -7,6 +7,7 @@ async function main() {
   console.log('Seeding database...');
 
   // Clean previous seed data (idempotent)
+  await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.driverDocument.deleteMany();
   await prisma.vehicle.deleteMany();
@@ -133,6 +134,46 @@ async function main() {
     },
   });
   console.log(`  ✓ Driver: ${driverUser.email}`);
+
+  // --- Notifications ---
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: customerUser.id,
+        type: 'WELCOME',
+        title: 'Welcome to Portway',
+        body: 'Your account is ready. Create your first delivery to get started.',
+        channel: 'IN_APP',
+        status: 'SENT',
+      },
+      {
+        userId: customerUser.id,
+        type: 'SYSTEM_UPDATE',
+        title: 'Platform update',
+        body: 'Live tracking and instant notifications are coming soon.',
+        channel: 'IN_APP',
+        status: 'SENT',
+        readAt: new Date(),
+      },
+      {
+        userId: customerUser.id,
+        type: 'DELIVERY_CREATED',
+        title: 'Delivery created',
+        body: 'A sample delivery was created for your account (demo).',
+        channel: 'IN_APP',
+        status: 'SENT',
+      },
+      {
+        userId: driverUser.id,
+        type: 'WELCOME',
+        title: 'Welcome, driver',
+        body: 'Your driver account is approved. Go online to receive delivery offers.',
+        channel: 'IN_APP',
+        status: 'SENT',
+      },
+    ],
+  });
+  console.log(`  ✓ Created 4 notifications`);
 
   // Audit log entry
   await prisma.auditLog.create({
