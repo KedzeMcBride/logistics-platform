@@ -105,3 +105,37 @@
 - [ ] User, RefreshToken, CustomerProfile, DriverProfile, Vehicle, DriverDocument, Address
 - [ ] Seed script with admin + customer + driver
 - [ ] Migration `users_profiles`
+
+## Day 4 — Prisma Schema v1 ✅ COMPLETE
+
+### Completed
+- [x] Models: User, RefreshToken, CustomerProfile, DriverProfile, Vehicle, DriverDocument, Address, AuditLog
+- [x] Enums: Role, DriverAvailability
+- [x] Migration `users_profiles` applied
+- [x] Seed script creates 4 users + profiles + addresses + vehicle + documents
+- [x] Password hashing via bcryptjs (10 rounds)
+- [x] Prisma Studio verified
+- [x] `packages/database/src/index.ts` re-exports `@prisma/client`
+
+### Seed Users (password: Password123!)
+- admin@logistics.local (ADMIN)
+- ops@logistics.local (OPERATIONS_MANAGER)
+- customer@logistics.local (CUSTOMER) — 2 addresses
+- driver@logistics.local (DRIVER) — 1 vehicle, 2 docs, APPROVED
+
+### Architecture Decisions
+- Soft delete via deletedAt on User and Address
+- RefreshToken has familyId for rotation + reuse detection
+- AuditLog polymorphic via (entityType, entityId)
+- bcryptjs instead of argon2 (no native build tools needed on Windows)
+- Prisma enums mirror @repo/shared string-for-string
+
+### Problems Solved
+- argon2 required C++ build tools → switched to bcryptjs
+- `console` not recognized → added @types/node to packages/database
+- PowerShell quoting ate double quotes in psql commands → use here-strings
+
+## Day 5 — CI Pipeline (NEXT)
+- [ ] GitHub Actions: lint → typecheck → test → build
+- [ ] Service containers for Postgres + Redis
+- [ ] Prisma migrate + seed in CI
