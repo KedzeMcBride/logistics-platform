@@ -89,18 +89,7 @@ jobs:
         run: pnpm lint --force
 
       - name: Format check
-        run: |
-          echo "=== README.md first 300 bytes ==="
-          head -c 300 README.md | xxd
-          echo ""
-          echo "=== README.md cat -A ==="
-          cat -A README.md | head -20
-          echo ""
-          echo "=== git check-attr ==="
-          git check-attr -a README.md
-          echo ""
-          echo "=== Prettier check ==="
-          pnpm format:check
+        run: pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck
