@@ -7,5 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Real models land on Day 4.
-// This file exists so `pnpm db:generate` runs cleanly today.
+model HealthCheck {
+  id        Int      @id @default(autoincrement())
+  checkedAt DateTime @default(now())
+}

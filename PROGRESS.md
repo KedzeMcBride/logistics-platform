@@ -40,3 +40,35 @@
 - [ ] Root `.env.example`
 - [ ] Prisma connected to live Postgres
 - [ ] `/health` endpoint pings DB + Redis
+
+## Day 2 — Docker Compose + Database ✅ COMPLETE
+
+### Completed
+- [x] docker-compose.yml with postgis/postgis:16-3.4 and redis:7-alpine
+- [x] Named volumes for persistence, healthchecks on both
+- [x] PostGIS extension enabled in `logistics` database
+- [x] Root `.env` + `.env.example` with DATABASE_URL and REDIS_URL
+- [x] Prisma connected, first migration `init` applied
+- [x] `HealthCheck` placeholder table created
+- [x] ConfigModule + PrismaModule + RedisModule wired in API
+- [x] `GET /api/v1/health` returns live db + redis status
+
+### Notes
+- Postgres: localhost:5432, user/pass/db: logistics
+- Redis: localhost:6379, AOF persistence enabled
+- Prisma 5.22.0
+- NestJS 10, @nestjs/config 3.3, @nestjs/terminus 10.3, ioredis 6.x
+- Docker containers do NOT auto-start; run `docker start logistics-postgres logistics-redis` after boot
+
+### Problems Solved
+- Prisma schema validator "line 11 invalid" — fixed by using `pnpm prisma migrate dev` (not `pnpm exec` or direct `.bin`)
+- NestJS 12 packages incompatible with NestJS 10 — pinned to @nestjs/config@3.3.0 and @nestjs/terminus@10.2.3
+- npm registry timeouts — retried, eventually succeeded
+- Docker Desktop not running — started manually
+- Both containers stopped after machine restart — documented `docker start` command
+
+## Day 3 — Shared Types & Enums (NEXT)
+- [ ] Enums: Role, DeliveryStatus, DeliveryPriority, DriverAvailability
+- [ ] WS event names (already partially in packages/shared)
+- [ ] API response types
+- [ ] Imported by both api and web
