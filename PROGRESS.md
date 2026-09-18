@@ -246,6 +246,7 @@
 ## Day 7 — Customer Frontend Foundation ✅ COMPLETE
 
 ### Completed
+
 - [x] `lib/api-client.ts` — fetch wrapper with token storage and auto-refresh on 401
 - [x] `features/auth/auth-provider.tsx` — React context (user, tokens, login/register/logout/refreshUser)
 - [x] `features/auth/use-auth.ts` — hook
@@ -263,6 +264,7 @@
 - [x] Landing page with CTAs
 
 ### Architecture Decisions
+
 - Route groups keep URLs clean (`/login`, not `/auth/login`)
 - AuthProvider in root layout so `useAuth()` works everywhere
 - Pages are server components; only interactive forms are `'use client'`
@@ -271,6 +273,7 @@
 - API `enableCors` allows exact origins only (localhost + 127.0.0.1 on port 3000)
 
 ### Problems Solved
+
 - Stray `(auth)/layout.tsx` with bad default export → rewrote
 - Root layout missing `<AuthProvider>` → added
 - Duplicate header on login/register → moved to `(auth)/layout.tsx`
@@ -280,6 +283,7 @@
 - Stray `features/auth/login/` and `features/auth/registration/` folders → deleted
 
 ## Day 8 — Dashboard Shell & Navigation (NEXT)
+
 - [ ] Sidebar layout for authenticated pages
 - [ ] Role-aware navigation (customer / driver / admin)
 - [ ] Placeholder pages: `/deliveries`, `/profile`, `/notifications`
