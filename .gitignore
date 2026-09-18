@@ -8,6 +8,11 @@ dist/
 build/
 out/
 
+# TypeScript incremental build cache
+# (must be ignored or CI will use stale type info and fail with
+# "Module has no exported member" errors after refactors)
+*.tsbuildinfo
+
 # Cache
 .turbo/
 .cache/
