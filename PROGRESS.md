@@ -289,3 +289,42 @@
 - [ ] Placeholder pages: `/deliveries`, `/profile`, `/notifications`
 - [ ] Loading skeletons and error boundaries
 - [ ] Empty state component
+
+## Day 8 — Dashboard Shell & Navigation ✅ COMPLETE
+
+### Completed
+
+- [x] `components/layout/app-sidebar.tsx` — nav with active state (Dashboard, Deliveries, Notifications, Profile)
+- [x] `components/layout/app-header.tsx` — page title, user info, logout
+- [x] `components/ui/empty-state.tsx` — reusable placeholder
+- [x] `components/ui/skeleton.tsx` — loading placeholders (Skeleton, SkeletonText, SkeletonCard)
+- [x] `components/ui/error-boundary.tsx` — React class error boundary
+- [x] `app/(customer)/error.tsx` — Next.js error boundary convention
+- [x] `(customer)/layout.tsx` — sidebar + header + main
+- [x] `(customer)/dashboard/page.tsx` — refined welcome + stat cards + empty state
+- [x] Placeholders: `/deliveries`, `/notifications`, `/profile`
+- [x] All nav links work; sidebar highlights active route
+- [x] Error boundary verified with deliberate throw
+- [x] Sidebar hidden below 768px
+
+### Architecture Decisions
+
+- Sidebar uses `hidden md:block`; mobile drawer deferred
+- Two error boundaries: React class + Next.js `error.tsx`
+- Skeleton uses Tailwind's `animate-pulse` — no extra library
+- Page titles derived from pathname in header
+- `lib/utils.ts` `cn()` helper via clsx + tailwind-merge
+
+### Problems Solved
+
+- `lib/utils.ts` was missing → created with clsx + tailwind-merge
+- clsx and tailwind-merge not installed → added to apps/web
+- SiteHeader replaced by AppHeader for the authenticated shell
+
+## Day 9 — Notifications Foundation (NEXT)
+
+- [ ] `GET /api/v1/notifications` — list current user's notifications
+- [ ] `PATCH /api/v1/notifications/:id/read`
+- [ ] `PATCH /api/v1/notifications/read-all`
+- [ ] Notification badge on sidebar
+- [ ] Notifications page renders real data
