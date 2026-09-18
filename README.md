@@ -29,3 +29,10 @@ admin operations, and AI-assisted dispatch.
 
 - `docs/adr/` — Architecture Decision Records
 - `PROGRESS.md` — daily build log
+
+# Logistics & Delivery Management Platform
+
+[![CI](https://github.com/KedzeMcBride/logistics-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/KedzeMcBride/logistics-platform/actions/workflows/ci.yml)
+
+A real-time logistics and delivery platform with live tracking, driver assignment,
+admin operations, and AI-assisted dispatch.
