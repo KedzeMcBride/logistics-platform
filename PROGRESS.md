@@ -72,3 +72,36 @@
 - [ ] WS event names (already partially in packages/shared)
 - [ ] API response types
 - [ ] Imported by both api and web
+
+## Day 3 — Shared Types & Contracts ✅ COMPLETE
+
+### Completed
+- [x] Enums as const objects: Role, DeliveryStatus, DeliveryPriority, DriverAvailability
+- [x] Derived TS types via `(typeof X)[keyof typeof X]`
+- [x] API response envelopes: ApiResponse<T>, ApiSuccess<T>, ApiError
+- [x] Pagination types: Paginated<T>, PaginationQuery
+- [x] Delivery DTOs: DeliverySummary, DeliveryDto
+- [x] WS events + payload types
+- [x] Zod schemas for query validation
+- [x] Constants: APP_NAME, API_VERSION, API_PREFIX, PORTS
+- [x] `@repo/shared` compiles to `dist/` (CommonJS via Node16 resolution)
+- [x] apps/api imports @repo/shared (proven via /api/v1/meta)
+- [x] apps/web imports @repo/shared
+
+### Architecture Decisions
+- Enums as const objects (not TS `enum`) — Prisma/Zod interop
+- Zod 4 for runtime validation
+- Shared package compiles to CommonJS (`module: Node16`)
+- No `"type": "module"` in shared package.json
+- `main`/`types` point to `dist/`, not `src/`
+- `clean` scripts use `rimraf` for cross-platform support
+
+### Problems Solved
+- ESM/CJS mismatch (experimental warning) — switched shared to CommonJS
+- `moduleResolution: "Node"` deprecated — switched to `Node16`
+- `Remove-Item` not available in pnpm scripts (cmd.exe) — replaced with `rimraf`
+
+## Day 4 — Prisma Schema v1 (NEXT)
+- [ ] User, RefreshToken, CustomerProfile, DriverProfile, Vehicle, DriverDocument, Address
+- [ ] Seed script with admin + customer + driver
+- [ ] Migration `users_profiles`
