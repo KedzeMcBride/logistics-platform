@@ -1,5 +1,4 @@
 import { Controller, Get } from '@nestjs/common';
-
 import { ALL_DELIVERY_STATUSES, API_VERSION, APP_NAME } from '@repo/shared';
 
 import { AppService } from './app.service';

@@ -3,6 +3,7 @@
 ## Day 1 — Monorepo Scaffold COMPLETE
 
 ### Completed
+
 - [x] Git repo + `.gitattributes` (LF normalization)
 - [x] pnpm workspace + Turborepo 2.10
 - [x] Prettier + EditorConfig
@@ -14,12 +15,14 @@
 - [x] `pnpm dev` at root starts both apps
 
 ### Environment
+
 - Node 22.12, pnpm 9.15
 - TypeScript 5.6+, Next 15.5.25, React 19
 - NestJS 10, Tailwind v4 (CSS-first, no tailwind.config.ts)
 - Prisma 5.22 (schema empty, models land Day 4)
 
 ### Key Decisions
+
 - `@repo/config/tsconfig/*` package-name resolution for tsconfig extends
 - `core.autocrlf=input` + `.gitattributes` normalize all text to LF
 - API on 3001, web on 3000, no collision
@@ -27,6 +30,7 @@
 - Component-based structure planned for web (deferred to Week 6)
 
 ### Problems Solved
+
 - pnpm 12.4.2 broken shim → reinstalled via corepack → 9.15
 - `@repo/config` not resolvable → added to root devDependencies + exports map
 - `rootDir` resolved to wrong path → removed from base tsconfig
@@ -36,6 +40,7 @@
 - Stale lockfile → delete `pnpm-lock.yaml` and reinstall
 
 ## Day 2 — Docker Compose + Database (NEXT)
+
 - [ ] `docker-compose.yml` with Postgres (PostGIS) + Redis
 - [ ] Root `.env.example`
 - [ ] Prisma connected to live Postgres
@@ -44,6 +49,7 @@
 ## Day 2 — Docker Compose + Database ✅ COMPLETE
 
 ### Completed
+
 - [x] docker-compose.yml with postgis/postgis:16-3.4 and redis:7-alpine
 - [x] Named volumes for persistence, healthchecks on both
 - [x] PostGIS extension enabled in `logistics` database
@@ -54,6 +60,7 @@
 - [x] `GET /api/v1/health` returns live db + redis status
 
 ### Notes
+
 - Postgres: localhost:5432, user/pass/db: logistics
 - Redis: localhost:6379, AOF persistence enabled
 - Prisma 5.22.0
@@ -61,6 +68,7 @@
 - Docker containers do NOT auto-start; run `docker start logistics-postgres logistics-redis` after boot
 
 ### Problems Solved
+
 - Prisma schema validator "line 11 invalid" — fixed by using `pnpm prisma migrate dev` (not `pnpm exec` or direct `.bin`)
 - NestJS 12 packages incompatible with NestJS 10 — pinned to @nestjs/config@3.3.0 and @nestjs/terminus@10.2.3
 - npm registry timeouts — retried, eventually succeeded
@@ -68,6 +76,7 @@
 - Both containers stopped after machine restart — documented `docker start` command
 
 ## Day 3 — Shared Types & Enums (NEXT)
+
 - [ ] Enums: Role, DeliveryStatus, DeliveryPriority, DriverAvailability
 - [ ] WS event names (already partially in packages/shared)
 - [ ] API response types
@@ -76,6 +85,7 @@
 ## Day 3 — Shared Types & Contracts ✅ COMPLETE
 
 ### Completed
+
 - [x] Enums as const objects: Role, DeliveryStatus, DeliveryPriority, DriverAvailability
 - [x] Derived TS types via `(typeof X)[keyof typeof X]`
 - [x] API response envelopes: ApiResponse<T>, ApiSuccess<T>, ApiError
@@ -89,6 +99,7 @@
 - [x] apps/web imports @repo/shared
 
 ### Architecture Decisions
+
 - Enums as const objects (not TS `enum`) — Prisma/Zod interop
 - Zod 4 for runtime validation
 - Shared package compiles to CommonJS (`module: Node16`)
@@ -97,11 +108,13 @@
 - `clean` scripts use `rimraf` for cross-platform support
 
 ### Problems Solved
+
 - ESM/CJS mismatch (experimental warning) — switched shared to CommonJS
 - `moduleResolution: "Node"` deprecated — switched to `Node16`
 - `Remove-Item` not available in pnpm scripts (cmd.exe) — replaced with `rimraf`
 
 ## Day 4 — Prisma Schema v1 (NEXT)
+
 - [ ] User, RefreshToken, CustomerProfile, DriverProfile, Vehicle, DriverDocument, Address
 - [ ] Seed script with admin + customer + driver
 - [ ] Migration `users_profiles`
@@ -109,6 +122,7 @@
 ## Day 4 — Prisma Schema v1 ✅ COMPLETE
 
 ### Completed
+
 - [x] Models: User, RefreshToken, CustomerProfile, DriverProfile, Vehicle, DriverDocument, Address, AuditLog
 - [x] Enums: Role, DriverAvailability
 - [x] Migration `users_profiles` applied
@@ -118,12 +132,14 @@
 - [x] `packages/database/src/index.ts` re-exports `@prisma/client`
 
 ### Seed Users (password: Password123!)
+
 - admin@logistics.local (ADMIN)
 - ops@logistics.local (OPERATIONS_MANAGER)
 - customer@logistics.local (CUSTOMER) — 2 addresses
 - driver@logistics.local (DRIVER) — 1 vehicle, 2 docs, APPROVED
 
 ### Architecture Decisions
+
 - Soft delete via deletedAt on User and Address
 - RefreshToken has familyId for rotation + reuse detection
 - AuditLog polymorphic via (entityType, entityId)
@@ -131,11 +147,13 @@
 - Prisma enums mirror @repo/shared string-for-string
 
 ### Problems Solved
+
 - argon2 required C++ build tools → switched to bcryptjs
 - `console` not recognized → added @types/node to packages/database
 - PowerShell quoting ate double quotes in psql commands → use here-strings
 
 ## Day 5 — CI Pipeline (NEXT)
+
 - [ ] GitHub Actions: lint → typecheck → test → build
 - [ ] Service containers for Postgres + Redis
 - [ ] Prisma migrate + seed in CI

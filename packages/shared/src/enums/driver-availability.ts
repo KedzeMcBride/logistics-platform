@@ -6,6 +6,5 @@ export const DriverAvailability = {
 
 export type DriverAvailability = (typeof DriverAvailability)[keyof typeof DriverAvailability];
 
-export const ALL_DRIVER_AVAILABILITIES: readonly DriverAvailability[] = Object.values(
-  DriverAvailability,
-);
+export const ALL_DRIVER_AVAILABILITIES: readonly DriverAvailability[] =
+  Object.values(DriverAvailability);

@@ -33,7 +33,6 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .turbo dist"
   },

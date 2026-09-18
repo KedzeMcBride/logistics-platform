@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9.15.0'
+  DATABASE_URL: 'postgresql://logistics:logistics@localhost:5432/logistics?schema=public'
+  REDIS_URL: 'redis://localhost:6379'
+  JWT_SECRET: 'ci-test-secret'
+  JWT_REFRESH_SECRET: 'ci-test-refresh-secret'
+  NODE_ENV: 'test'
+
+jobs:
+  ci:
+    name: Lint, Typecheck, Test, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: logistics
+          POSTGRES_PASSWORD: logistics
+          POSTGRES_DB: logistics
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U logistics -d logistics"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Enable PostGIS extension
+        run: |
+          PGPASSWORD=logistics psql -h localhost -U logistics -d logistics -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
+      - name: Run database migrations
+        working-directory: packages/database
+        run: pnpm prisma migrate deploy
+
+      - name: Generate Prisma client
+        run: pnpm --filter @repo/database db:generate
+
+      - name: Seed database
+        run: pnpm --filter @repo/database db:seed
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test

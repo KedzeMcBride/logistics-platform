@@ -23,9 +23,7 @@ export function StatusPanel() {
 
 function StatusCard({ label, value }: ServiceStatus) {
   return (
-    <div
-      className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-slate-700"
-    >
+    <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-slate-700">
       <p className="text-xs uppercase tracking-widest text-slate-500">{label}</p>
       <p className="mt-1 font-mono text-sm text-emerald-400">{value}</p>
     </div>
