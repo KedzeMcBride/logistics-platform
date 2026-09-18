@@ -19,7 +19,10 @@ describe('AuthService (integration)', () => {
   beforeAll(async () => {
     module = await Test.createTestingModule({
       imports: [
-        ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['.env.test', '.env', '../../.env'],
+        }),
         JwtModule.registerAsync({
           inject: [ConfigService],
           useFactory: (config: ConfigService) => ({
