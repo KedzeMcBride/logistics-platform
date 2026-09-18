@@ -328,3 +328,43 @@
 - [ ] `PATCH /api/v1/notifications/read-all`
 - [ ] Notification badge on sidebar
 - [ ] Notifications page renders real data
+
+## Day 9 — Notifications Foundation ✅ COMPLETE
+
+### Completed
+
+- [x] Added `Notification` model + 3 composite indexes to Prisma schema
+- [x] Migration `add_notifications`
+- [x] Seed creates 4 notifications (3 customer, 1 driver)
+- [x] `NotificationsService` — list (paginated), unreadCount, markRead, markAllRead with ownership checks
+- [x] `NotificationsController` — 4 endpoints
+- [x] Route order: `unread-count` and `read-all` before parameterized `:id/read`
+- [x] `useNotifications()` hook — polling every 30s + optimistic updates
+- [x] `UnreadBadge` component in sidebar
+- [x] Notifications page with skeleton, empty, error states + relative timestamps
+- [x] Integration tests: 9 tests
+
+### Architecture Decisions
+
+- Polling every 30s; WebSocket replaces this in Day 15
+- Optimistic updates with rollback on API failure
+- Ownership check via `findFirst({ where: { id, userId } })`
+- Bulk update via `updateMany` for mark-all
+- Dedicated `unreadCount` endpoint (indexed, cheap)
+- Route order matters: static paths before parameterized
+- Composite indexes: `(userId, status)`, `(userId, readAt)`, `(userId, createdAt)`
+
+### Problems Solved
+
+- Notifications model was in design but not in Day 4 schema → added now
+- `notifications` relation missing on User → added
+- Seed didn't create notifications → updated
+
+## Day 10 — Deliveries Foundation (NEXT)
+
+- [ ] Delivery model in Prisma schema
+- [ ] Create delivery endpoint + DTO
+- [ ] List and detail endpoints with role scoping
+- [ ] Delivery pricing engine v1 (distance + weight + priority)
+- [ ] Deliveries list page + create form
+- [ ] Delivery detail page with status timeline
