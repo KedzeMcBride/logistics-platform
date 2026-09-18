@@ -391,3 +391,5 @@ Retrospective: in Week 4, when something breaks, you can look at Day 1's decisio
 Context recovery: if you stop for two weeks, this doc gets you back in 10 minutes
 
 Command to save it
+
+docker ps state of docker file
