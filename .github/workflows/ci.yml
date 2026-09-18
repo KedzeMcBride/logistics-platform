@@ -57,13 +57,13 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
           run_install: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          run_install: false
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -86,10 +86,21 @@ jobs:
         run: pnpm --filter @repo/database db:seed
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm lint --force
 
       - name: Format check
-        run: pnpm format:check
+        run: |
+          echo "=== README.md first 300 bytes ==="
+          head -c 300 README.md | xxd
+          echo ""
+          echo "=== README.md cat -A ==="
+          cat -A README.md | head -20
+          echo ""
+          echo "=== git check-attr ==="
+          git check-attr -a README.md
+          echo ""
+          echo "=== Prettier check ==="
+          pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck

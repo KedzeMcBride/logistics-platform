@@ -6,6 +6,8 @@
 
 # staring the docker container for postgres and redis docker start logistics-postgres logistics-redis
 
+# format with prettier pnpm format
+
 # Open prisma DB pnpm --filter @repo/database db:studio
 
 A real-time logistics and delivery platform with live tracking, driver assignment,
