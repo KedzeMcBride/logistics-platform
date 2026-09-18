@@ -21,6 +21,7 @@ module.exports = {
   },
   ignorePatterns: ['.eslintrc.js', 'dist', 'node_modules', 'coverage'],
   rules: {
+    'import/no-unresolved': 'off',
     '@typescript-eslint/no-unused-vars': [
       'warn',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -38,7 +39,7 @@ module.exports = {
         alphabetize: { order: 'asc', caseInsensitive: true },
       },
     ],
-    'no-console': ['warn', { allow: ['warn', 'error', 'log'] }],
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
     eqeqeq: ['error', 'always'],
     'prefer-const': 'error',
   },

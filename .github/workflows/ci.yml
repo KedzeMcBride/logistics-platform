@@ -79,6 +79,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @repo/database db:generate
 
+      - name: Build
+        run: pnpm build
+
       - name: Seed database
         run: pnpm --filter @repo/database db:seed
 
@@ -90,9 +93,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
-
-      - name: Build
-        run: pnpm build
 
       - name: Test
         run: pnpm test
