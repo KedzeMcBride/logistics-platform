@@ -7,7 +7,167 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model HealthCheck {
-  id        Int      @id @default(autoincrement())
-  checkedAt DateTime @default(now())
+// =============================================================================
+// ENUMS (must match @repo/shared exactly)
+// =============================================================================
+
+enum Role {
+  CUSTOMER
+  DRIVER
+  ADMIN
+  OPERATIONS_MANAGER
+}
+
+enum DriverAvailability {
+  ONLINE
+  OFFLINE
+  ON_DELIVERY
+}
+
+// =============================================================================
+// IDENTITY
+// =============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  phone        String?   @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean   @default(true)
+  isSuspended  Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customerProfile CustomerProfile?
+  driverProfile   DriverProfile?
+  addresses       Address[]
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]        @relation("ActorAuditLogs")
+
+  @@index([role])
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String
+  familyId   String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+// =============================================================================
+// PROFILES
+// =============================================================================
+
+model CustomerProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName  String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DriverProfile {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName        String
+  avatarUrl       String?
+  availability    DriverAvailability @default(OFFLINE)
+  approvalStatus  String             @default("PENDING") // PENDING | APPROVED | REJECTED
+  rating          Decimal            @default(5.0) @db.Decimal(3, 2)
+  totalDeliveries Int                @default(0)
+  currentLat      Float?
+  currentLng      Float?
+  lastLocationAt  DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  vehicles   Vehicle[]
+  documents  DriverDocument[]
+
+  @@index([availability])
+  @@index([approvalStatus])
+}
+
+model Vehicle {
+  id          String        @id @default(uuid())
+  driverId    String
+  driver      DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type        String // BIKE | CAR | VAN | TRUCK
+  plateNumber String
+  capacityKg  Float?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+
+  @@index([driverId])
+}
+
+model DriverDocument {
+  id         String        @id @default(uuid())
+  driverId   String
+  driver     DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type       String // LICENSE | ID | INSURANCE | VEHICLE_REGISTRATION
+  fileUrl    String
+  status     String        @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@index([driverId])
+  @@index([status])
+}
+
+// =============================================================================
+// ADDRESSES
+// =============================================================================
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  line1     String
+  city      String
+  region    String?
+  country   String
+  lat       Float
+  lng       Float
+  isDefault Boolean  @default(false)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isDefault])
+}
+
+// =============================================================================
+// AUDIT
+// =============================================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
 }
