@@ -12,6 +12,8 @@
 
 # mock test user customer@logistics.local / Password123!
 
+# driver mock details driver@logistics.local / Password123!
+
 A real-time logistics and delivery platform with live tracking, driver assignment,
 admin operations, and AI-assisted dispatch.
 

@@ -10,6 +10,7 @@ import { NotificationsModule } from './notifications';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
+import { DriversModule } from './drivers';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     NotificationsModule,
     DeliveriesModule,
+    DriversModule,
   ],
   controllers: [AppController],
   providers: [AppService],
