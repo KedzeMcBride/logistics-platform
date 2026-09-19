@@ -2,7 +2,7 @@
 
 # starting the backend api curl.exe http://localhost:3001/api/v1
 
-# starting the webapp pnpm --filter @repo/web dev
+# starting the webapp pnpm --filter @repo/web dev / pnpm --filter @repo/api dev
 
 # staring the docker container for postgres and redis docker start logistics-postgres logistics-redis
 

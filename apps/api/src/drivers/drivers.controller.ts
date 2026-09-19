@@ -5,12 +5,7 @@ import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '../auth';
 import type { AuthenticatedUser } from '../auth/strategies';
 
 import { DriversService } from './drivers.service';
-import {
-  AddDocumentDto,
-  AddVehicleDto,
-  SetAvailabilityDto,
-  UpdateVehicleDto,
-} from './dto';
+import { AddDocumentDto, AddVehicleDto, SetAvailabilityDto, UpdateVehicleDto } from './dto';
 
 @Controller('drivers')
 @UseGuards(JwtAuthGuard, RolesGuard)

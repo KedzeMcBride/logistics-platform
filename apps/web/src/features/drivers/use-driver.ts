@@ -79,18 +79,15 @@ export function useDriverProfile() {
     };
   }, [fetch]);
 
-  const setAvailability = useCallback(
-    async (availability: DriverAvailability) => {
-      const updated = await apiClient.patch<DriverProfileDto>(
-        '/drivers/availability',
-        { availability },
-        { auth: true },
-      );
-      setDriver((prev) => (prev ? { ...prev, availability: updated.availability } : null));
-      return updated;
-    },
-    [],
-  );
+  const setAvailability = useCallback(async (availability: DriverAvailability) => {
+    const updated = await apiClient.patch<DriverProfileDto>(
+      '/drivers/availability',
+      { availability },
+      { auth: true },
+    );
+    setDriver((prev) => (prev ? { ...prev, availability: updated.availability } : null));
+    return updated;
+  }, []);
 
   return { driver, isLoading, error, refetch: fetch, setAvailability };
 }
@@ -152,17 +149,13 @@ export async function rejectDriver(id: string, reason: string): Promise<DriverPr
 }
 
 export async function approveDocument(id: string): Promise<DriverDocumentDto> {
-  return apiClient.patch<DriverDocumentDto>(
-    `/admin/drivers/documents/${id}/approve`,
-    undefined,
-    { auth: true },
-  );
+  return apiClient.patch<DriverDocumentDto>(`/admin/drivers/documents/${id}/approve`, undefined, {
+    auth: true,
+  });
 }
 
 export async function rejectDocument(id: string): Promise<DriverDocumentDto> {
-  return apiClient.patch<DriverDocumentDto>(
-    `/admin/drivers/documents/${id}/reject`,
-    undefined,
-    { auth: true },
-  );
+  return apiClient.patch<DriverDocumentDto>(`/admin/drivers/documents/${id}/reject`, undefined, {
+    auth: true,
+  });
 }

@@ -8,12 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
-import type {
-  AddDocumentDto,
-  AddVehicleDto,
-  SetAvailabilityDto,
-  UpdateVehicleDto,
-} from './dto';
+import type { AddDocumentDto, AddVehicleDto, SetAvailabilityDto, UpdateVehicleDto } from './dto';
 
 const DRIVER_GEO_KEY = 'driver:locations';
 

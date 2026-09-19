@@ -2,15 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Bell,
-  Car,
-  FileText,
-  LayoutDashboard,
-  Package,
-  User,
-  type LucideIcon,
-} from 'lucide-react';
+import { Bell, Car, FileText, LayoutDashboard, Package, User, type LucideIcon } from 'lucide-react';
 
 import { useAuth } from '@/features/auth/use-auth';
 import { UnreadBadge } from '@/features/notifications';
@@ -49,7 +41,11 @@ export function AppSidebar() {
   const { user } = useAuth();
 
   const items =
-    user?.role === 'DRIVER' ? DRIVER_NAV : user?.role === 'ADMIN' || user?.role === 'OPERATIONS_MANAGER' ? ADMIN_NAV : CUSTOMER_NAV;
+    user?.role === 'DRIVER'
+      ? DRIVER_NAV
+      : user?.role === 'ADMIN' || user?.role === 'OPERATIONS_MANAGER'
+        ? ADMIN_NAV
+        : CUSTOMER_NAV;
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-neutral-200 bg-white md:block">
