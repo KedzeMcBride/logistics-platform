@@ -368,3 +368,46 @@
 - [ ] Delivery pricing engine v1 (distance + weight + priority)
 - [ ] Deliveries list page + create form
 - [ ] Delivery detail page with status timeline
+
+## Day 10 — Deliveries Foundation ✅ COMPLETE
+
+### Completed
+
+- [x] Schema: Delivery, DeliveryStatusHistory, DeliveryLocation, Rating models
+- [x] Migration `deliveries`
+- [x] Seed creates 3 sample deliveries (PENDING, CONFIRMED, CANCELLED)
+- [x] PricingService in XAF (FCFA): base 1000, per-km 150, per-kg 50, priority surcharges
+- [x] Haversine distance + duration estimation (25 km/h urban)
+- [x] 6 endpoints: quote, create, list (role-scoped), detail, confirm, cancel
+- [x] DeliveriesService with ownership checks + status transitions in transactions
+- [x] Deliveries list page with status badges + FCFA prices
+- [x] 6-step create form with live quote
+- [x] Delivery detail page with status timeline + confirm/cancel actions
+- [x] Dashboard stat cards wired to real data
+- [x] `formatFCFA` and `formatXAF` helpers
+- [x] Tests: 4 suites, 34 tests (auth, notifications, deliveries, pricing)
+
+### Architecture Decisions
+
+- All pricing in XAF (Central African CFA Franc), integers only
+- Haversine for distance (Google Maps Directions replaces this Day 15)
+- Status transitions via Prisma transactions then re-fetch for full relations
+- Route order: `/quote` before POST `/`; `/confirm`, `/cancel` under `/:id`
+- Role-scoped list: customer sees own, driver sees assigned, admin sees all
+- File placement: `features/deliveries/` for logic/components; `app/(customer)/deliveries/` for pages
+
+### Problems Solved
+
+- `create-delivery-form.tsx` initially placed in route folder → moved to features
+- Session expiry during testing → cleared storage, log in fresh
+- `transition()` returned stale history (update `include` fetched before history insert) → transaction writes, then re-fetch
+- `cancel()` same issue → same fix
+- `pricing.service.spec.ts` missing → created
+
+## Day 11 — Driver Management (NEXT)
+
+- [ ] Driver documents upload (API + page)
+- [ ] Admin approval workflow
+- [ ] Vehicle CRUD
+- [ ] Driver availability toggle (ONLINE/OFFLINE)
+- [ ] Driver dashboard shell
