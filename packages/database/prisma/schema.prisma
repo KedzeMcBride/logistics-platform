@@ -40,6 +40,7 @@ model User {
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  cancelledDeliveries Delivery[] @relation("CancelledByUser")
 
   customerProfile CustomerProfile?
   driverProfile   DriverProfile?
@@ -78,6 +79,8 @@ model CustomerProfile {
   avatarUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deliveries     Delivery[]  @relation("CustomerDeliveries")
+  ratingsGiven   Rating[]    @relation("RatingsByCustomer")
 }
 
 model DriverProfile {
@@ -95,6 +98,8 @@ model DriverProfile {
   lastLocationAt  DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+  deliveries     Delivery[]  @relation("DriverDeliveries")
+  ratingsReceived Rating[]   @relation("RatingsForDriver")
 
   vehicles  Vehicle[]
   documents DriverDocument[]
@@ -193,4 +198,134 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorId])
   @@index([createdAt])
+}
+
+// =============================================================================
+// DELIVERY ENUMS
+// =============================================================================
+
+enum DeliveryStatus {
+  PENDING
+  CONFIRMED
+  SEARCHING_FOR_DRIVER
+  DRIVER_ASSIGNED
+  DRIVER_ACCEPTED
+  DRIVER_EN_ROUTE_TO_PICKUP
+  ARRIVED_AT_PICKUP
+  PACKAGE_PICKED_UP
+  IN_TRANSIT
+  ARRIVED_AT_DESTINATION
+  DELIVERED
+  CANCELLED
+  FAILED
+  RETURNED
+  EXPIRED
+}
+
+enum DeliveryPriority {
+  STANDARD
+  EXPRESS
+  SAME_DAY
+}
+
+// =============================================================================
+// DELIVERIES
+// =============================================================================
+
+model Delivery {
+  id                 String           @id @default(uuid())
+  customerId         String
+  customer           CustomerProfile  @relation("CustomerDeliveries", fields: [customerId], references: [id])
+  driverId           String?
+  driver             DriverProfile?   @relation("DriverDeliveries", fields: [driverId], references: [id])
+
+  pickupAddress      String
+  pickupLat          Float
+  pickupLng          Float
+  destinationAddress String
+  destinationLat     Float
+  destinationLng     Float
+
+  packageDescription  String
+  packageSizeCategory String
+  packageWeightKg     Float
+  priority            DeliveryPriority @default(STANDARD)
+  recipientName       String
+  recipientPhone      String
+  notes               String?
+
+  status              DeliveryStatus @default(PENDING)
+
+  estimatedDistanceKm  Float?
+  estimatedDurationMin Int?
+  estimatedPrice       Decimal? @db.Decimal(10, 2)
+  finalPrice           Decimal? @db.Decimal(10, 2)
+
+  assignmentAttempts   Int      @default(0)
+  cancelledById        String?
+  cancelledBy          User?    @relation("CancelledByUser", fields: [cancelledById], references: [id])
+  cancelledReason      String?
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  confirmedAt          DateTime?
+  pickedUpAt           DateTime?
+  deliveredAt          DateTime?
+  cancelledAt          DateTime?
+
+  statusHistory        DeliveryStatusHistory[]
+  locations            DeliveryLocation[]
+  rating               Rating?
+
+  @@index([status])
+  @@index([customerId])
+  @@index([driverId])
+  @@index([createdAt])
+}
+
+model DeliveryStatusHistory {
+  id         String          @id @default(uuid())
+  deliveryId String
+  delivery   Delivery        @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  fromStatus DeliveryStatus?
+  toStatus   DeliveryStatus
+  changedBy  String
+  reason     String?
+  createdAt  DateTime        @default(now())
+
+  @@index([deliveryId, createdAt])
+}
+
+model DeliveryLocation {
+  id         String   @id @default(uuid())
+  deliveryId String
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  driverId   String
+  lat        Float
+  lng        Float
+  speed      Float?
+  heading    Float?
+  accuracy   Float?
+  recordedAt DateTime @default(now())
+
+  @@index([deliveryId, recordedAt])
+}
+
+// =============================================================================
+// RATINGS (used later, model defined now so relations exist)
+// =============================================================================
+
+model Rating {
+  id         String          @id @default(uuid())
+  deliveryId String          @unique
+  delivery   Delivery        @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   CustomerProfile @relation("RatingsByCustomer", fields: [customerId], references: [id])
+  driverId   String
+  driver     DriverProfile   @relation("RatingsForDriver", fields: [driverId], references: [id])
+  score      Int
+  comment    String?
+  createdAt  DateTime        @default(now())
+
+  @@index([driverId])
 }

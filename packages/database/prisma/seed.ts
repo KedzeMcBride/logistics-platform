@@ -6,7 +6,10 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  // Clean previous seed data (idempotent)
+  await prisma.rating.deleteMany();
+  await prisma.deliveryLocation.deleteMany();
+  await prisma.deliveryStatusHistory.deleteMany();
+  await prisma.delivery.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.driverDocument.deleteMany();
@@ -135,6 +138,120 @@ async function main() {
   });
   console.log(`  ✓ Driver: ${driverUser.email}`);
 
+  // --- Sample deliveries (prices in XAF / FCFA) ---
+  const delivery1 = await prisma.delivery.create({
+    data: {
+      customerId: customerUser.customerProfile!.id,
+      pickupAddress: '123 Main Street, Springfield, IL',
+      pickupLat: 39.7817,
+      pickupLng: -89.6501,
+      destinationAddress: '456 Corporate Blvd, Springfield, IL',
+      destinationLat: 39.7995,
+      destinationLng: -89.644,
+      packageDescription: 'Small envelope with documents',
+      packageSizeCategory: 'SMALL',
+      packageWeightKg: 0.5,
+      priority: 'STANDARD',
+      recipientName: 'Jane Doe',
+      recipientPhone: '+15551111111',
+      status: 'PENDING',
+      estimatedDistanceKm: 2.1,
+      estimatedDurationMin: 8,
+      estimatedPrice: 1500,
+      statusHistory: {
+        create: {
+          fromStatus: null,
+          toStatus: 'PENDING',
+          changedBy: customerUser.id,
+          reason: 'Created via seed',
+        },
+      },
+    },
+  });
+  console.log(`  ✓ Delivery 1: ${delivery1.id.slice(0, 8)} (PENDING) - 1500 XAF`);
+
+  const delivery2 = await prisma.delivery.create({
+    data: {
+      customerId: customerUser.customerProfile!.id,
+      pickupAddress: '789 Oak Ave, Springfield, IL',
+      pickupLat: 39.768,
+      pickupLng: -89.653,
+      destinationAddress: '321 Pine St, Springfield, IL',
+      destinationLat: 39.79,
+      destinationLng: -89.64,
+      packageDescription: 'Medium box with electronics',
+      packageSizeCategory: 'MEDIUM',
+      packageWeightKg: 3.2,
+      priority: 'EXPRESS',
+      recipientName: 'John Smith',
+      recipientPhone: '+15552222222',
+      status: 'CONFIRMED',
+      estimatedDistanceKm: 4.5,
+      estimatedDurationMin: 14,
+      estimatedPrice: 2600,
+      confirmedAt: new Date(),
+      statusHistory: {
+        create: [
+          {
+            fromStatus: null,
+            toStatus: 'PENDING',
+            changedBy: customerUser.id,
+            reason: 'Created via seed',
+          },
+          {
+            fromStatus: 'PENDING',
+            toStatus: 'CONFIRMED',
+            changedBy: customerUser.id,
+            reason: 'Confirmed via seed',
+          },
+        ],
+      },
+    },
+  });
+  console.log(`  ✓ Delivery 2: ${delivery2.id.slice(0, 8)} (CONFIRMED) - 2600 XAF`);
+
+  const delivery3 = await prisma.delivery.create({
+    data: {
+      customerId: customerUser.customerProfile!.id,
+      pickupAddress: '555 Elm St, Springfield, IL',
+      pickupLat: 39.775,
+      pickupLng: -89.66,
+      destinationAddress: '999 Maple Dr, Springfield, IL',
+      destinationLat: 39.81,
+      destinationLng: -89.63,
+      packageDescription: 'Large package with furniture parts',
+      packageSizeCategory: 'LARGE',
+      packageWeightKg: 12.5,
+      priority: 'SAME_DAY',
+      recipientName: 'Bob Wilson',
+      recipientPhone: '+15553333333',
+      status: 'CANCELLED',
+      cancelledById: customerUser.id,
+      cancelledReason: 'Changed my mind',
+      cancelledAt: new Date(),
+      estimatedDistanceKm: 8.2,
+      estimatedDurationMin: 25,
+      estimatedPrice: 5500,
+      statusHistory: {
+        create: [
+          {
+            fromStatus: null,
+            toStatus: 'PENDING',
+            changedBy: customerUser.id,
+            reason: 'Created via seed',
+          },
+          {
+            fromStatus: 'PENDING',
+            toStatus: 'CANCELLED',
+            changedBy: customerUser.id,
+            reason: 'Changed my mind',
+          },
+        ],
+      },
+    },
+  });
+  console.log(`  ✓ Delivery 3: ${delivery3.id.slice(0, 8)} (CANCELLED) - 5500 XAF`);
+
   // --- Notifications ---
   await prisma.notification.createMany({
     data: [
@@ -185,6 +302,9 @@ async function main() {
       metadata: {
         usersCreated: 4,
         addressesCreated: 2,
+        deliveriesCreated: 3,
+        notificationsCreated: 4,
+        currency: 'XAF',
       },
     },
   });
