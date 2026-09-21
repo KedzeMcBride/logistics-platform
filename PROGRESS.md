@@ -411,3 +411,483 @@
 - [ ] Vehicle CRUD
 - [ ] Driver availability toggle (ONLINE/OFFLINE)
 - [ ] Driver dashboard shell
+
+# Day 11 — Driver Management
+
+## Overview
+
+Day 11 focused on completing the driver-facing management functionality across the backend and frontend.
+
+The implementation covers:
+
+- Driver dashboard
+- Driver profile
+- Driver availability
+- Vehicle management
+- Driver document management
+- Driver account/status information
+- Driver performance information
+- Driver location information
+- Driver API integration
+- Frontend loading and error states
+
+---
+
+## Completed
+
+### 1. Driver Backend
+
+Driver self-service functionality is implemented through the existing driver API.
+
+#### Driver profile
+
+```text
+GET /api/v1/drivers/me
+```
+
+The response provides:
+
+- Driver information
+- Account information
+- Approval status
+- Availability
+- Rating
+- Total deliveries
+- Current/last known location
+- Vehicles
+- Documents
+- Account status
+
+#### Driver availability
+
+```text
+PATCH /api/v1/drivers/availability
+```
+
+Business rules are enforced by the backend:
+
+- Driver must be `APPROVED` to go `ONLINE`.
+- Driver must have at least one active vehicle.
+- Going `ONLINE` updates the driver's availability/location state.
+
+#### Vehicle management
+
+Implemented operations:
+
+```text
+POST   /drivers/vehicles
+PATCH  /drivers/vehicles/:id
+DELETE /drivers/vehicles/:id
+```
+
+Supported vehicle types:
+
+```text
+BIKE
+CAR
+VAN
+TRUCK
+```
+
+Vehicle functionality includes:
+
+- Add vehicle
+- Update vehicle
+- Update capacity
+- Activate/deactivate vehicle
+- Soft delete vehicle
+- Ownership validation
+
+#### Document management
+
+Implemented:
+
+```text
+POST /drivers/documents
+```
+
+Supported document types:
+
+```text
+LICENSE
+ID
+INSURANCE
+VEHICLE_REGISTRATION
+```
+
+Document statuses:
+
+```text
+PENDING
+APPROVED
+REJECTED
+```
+
+Duplicate pending/approved document submissions are prevented by the backend.
+
+---
+
+# Frontend
+
+## 2. Driver Dashboard
+
+Implemented and verified:
+
+```text
+/driver/dashboard
+```
+
+The dashboard provides:
+
+- Driver information
+- Availability controls
+- Delivery statistics
+- Rating
+- Vehicle information
+- Document information
+- Driver status
+- Navigation to driver management pages
+
+Availability controls were tested successfully.
+
+---
+
+## 3. Driver Vehicles
+
+Implemented and verified:
+
+```text
+/driver/vehicles
+```
+
+The page correctly displays the driver's vehicles, including:
+
+- Vehicle type
+- Plate number
+- Capacity
+- Active status
+
+### Verification result
+
+The test driver currently has:
+
+```text
+2 ACTIVE VEHICLES
+```
+
+Both vehicles were correctly displayed on the vehicle management page.
+
+The driver profile also correctly reports:
+
+```text
+Active vehicles: 2
+```
+
+Vehicle integration is therefore confirmed.
+
+---
+
+## 4. Driver Documents
+
+Implemented and verified:
+
+```text
+/driver/documents
+```
+
+The test driver currently has:
+
+```text
+Driver License → APPROVED
+Insurance      → APPROVED
+```
+
+Both documents were correctly displayed with their approval status.
+
+Document information is also correctly represented on the driver profile.
+
+Document integration is therefore confirmed.
+
+---
+
+# 5. Driver Profile
+
+The driver profile was split into maintainable components instead of keeping the entire page in one large file.
+
+Structure:
+
+```text
+apps/web/src/features/drivers/
+├── use-driver.ts
+└── components/
+    ├── index.ts
+    ├── driver-account-info.tsx
+    ├── driver-account-timeline.tsx
+    ├── driver-documents-vehicles.tsx
+    ├── driver-location.tsx
+    ├── driver-performance.tsx
+    ├── driver-profile-header.tsx
+    ├── driver-profile-skeleton.tsx
+    └── driver-status-card.tsx
+```
+
+The route is:
+
+```text
+/driver/profile
+```
+
+The profile displays:
+
+- Driver name
+- Avatar/initials
+- Driver ID
+- Approval status
+- Availability
+- Account status
+- Email
+- Phone
+- User ID
+- Total deliveries
+- Rating
+- Active vehicles
+- Document status
+- Last known location
+- Account timeline
+
+The profile also includes loading and error states.
+
+---
+
+# 6. Driver Profile Hook
+
+Implemented:
+
+```text
+apps/web/src/features/drivers/use-driver.ts
+```
+
+`useDriverProfile()` handles:
+
+- Loading driver profile
+- Loading state
+- API errors
+- Profile refresh
+- Availability updates
+
+The same feature module provides API helpers for:
+
+- Vehicles
+- Documents
+- Driver administration
+
+---
+
+# 7. Availability Integration Test
+
+The availability workflow was tested successfully.
+
+Test driver state:
+
+```text
+Approval status: APPROVED
+Active vehicles: 2
+Initial availability: OFFLINE
+```
+
+Test sequence:
+
+```text
+OFFLINE
+   ↓
+ONLINE
+   ↓
+OFFLINE
+```
+
+Both transitions succeeded.
+
+This confirms that the frontend is correctly communicating with the driver availability API.
+
+The backend business rule requiring an approved driver with an active vehicle was also satisfied by the test driver.
+
+---
+
+# 8. Route Conflict Resolution
+
+Earlier in Day 11, Next.js reported a duplicate route caused by:
+
+```text
+(customer)/dashboard
+(driver)/dashboard
+```
+
+Both route groups resolved to:
+
+```text
+/dashboard
+```
+
+The routes were changed to explicit paths:
+
+```text
+/customer/dashboard
+/driver/dashboard
+```
+
+The driver routes are now:
+
+```text
+/driver/dashboard
+/driver/documents
+/driver/profile
+/driver/vehicles
+```
+
+---
+
+# 9. Next.js Build Verification
+
+The production build was successfully completed.
+
+Command:
+
+```powershell
+pnpm --filter @repo/web build
+```
+
+Final result:
+
+```text
+✓ Compiled successfully
+✓ Linting and checking validity of types
+✓ Collecting page data
+✓ Generating static pages (16/16)
+✓ Collecting build traces
+✓ Finalizing page optimization
+```
+
+The final route output confirmed:
+
+```text
+/driver/dashboard
+/driver/documents
+/driver/profile
+/driver/vehicles
+```
+
+The `/driver/profile` route is therefore successfully registered by Next.js.
+
+---
+
+# 10. TypeScript Verification
+
+Frontend type checking was successfully completed.
+
+Command:
+
+```powershell
+pnpm --filter @repo/web typecheck
+```
+
+Result:
+
+```text
+tsc --noEmit
+```
+
+No TypeScript errors were reported.
+
+---
+
+# 11. Development Runtime Verification
+
+A temporary Next.js runtime error occurred:
+
+```text
+Cannot find module './255.js'
+```
+
+The issue originated from the generated `.next` build output.
+
+The `.next` directory was cleaned and the development server restarted.
+
+After the clean rebuild:
+
+- Development server started successfully.
+- Driver profile opened successfully.
+- No runtime error remained.
+
+This was determined to be a stale/corrupted Next.js build cache rather than an application code issue.
+
+---
+
+# Day 11 Test Results
+
+| Area                            | Result         |
+| ------------------------------- | -------------- |
+| Driver dashboard                | ✅ Passed      |
+| Driver profile                  | ✅ Passed      |
+| Driver profile data             | ✅ Passed      |
+| Driver availability             | ✅ Passed      |
+| OFFLINE → ONLINE                | ✅ Passed      |
+| ONLINE → OFFLINE                | ✅ Passed      |
+| Vehicle management              | ✅ Passed      |
+| 2 active vehicles displayed     | ✅ Passed      |
+| Active vehicle count on profile | ✅ Passed      |
+| Driver license                  | ✅ APPROVED    |
+| Insurance                       | ✅ APPROVED    |
+| Document integration            | ✅ Passed      |
+| Loading/error states            | ✅ Implemented |
+| TypeScript typecheck            | ✅ Passed      |
+| Production build                | ✅ Passed      |
+| `/driver/profile` route         | ✅ Confirmed   |
+| Development runtime             | ✅ Passed      |
+
+---
+
+# Day 11 Status
+
+## COMPLETE
+
+The Day 11 Driver Management implementation and integration testing are complete.
+
+The only remaining repository task is to commit the updated documentation:
+
+```text
+PROGRESS.md
+```
+
+The Day 11 application code has already been committed separately.
+
+---
+
+## Final Day 11 Checklist
+
+- [x] Driver backend functionality
+- [x] Driver profile API
+- [x] Driver dashboard
+- [x] Vehicle management
+- [x] Document management
+- [x] Driver profile
+- [x] Driver profile components
+- [x] Driver availability
+- [x] Availability business rules
+- [x] Route conflict resolved
+- [x] Driver profile route confirmed
+- [x] Driver profile tested
+- [x] Availability tested
+- [x] Vehicle integration tested
+- [x] Document integration tested
+- [x] Frontend typecheck passed
+- [x] Production build passed
+- [x] Development runtime verified
+- [ ] Commit final `PROGRESS.md` documentation update
+
+---
+
+# Next Development Step
+
+After committing the final Day 11 documentation update, the project can proceed to **Day 12**.
+
+Day 12 should begin from the completed and tested Day 11 checkpoint rather than modifying the completed Driver Management implementation.
