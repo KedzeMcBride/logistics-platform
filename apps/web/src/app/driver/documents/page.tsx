@@ -194,9 +194,9 @@ export default function DriverDocumentsPage() {
         <button
           type="button"
           onClick={openAddForm}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-900"
+          className="inline-flex items-center gap-3 rounded-lg bg-[#488aec] px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-[0_4px_6px_-1px_rgba(72,138,236,0.19),0_2px_4px_-1px_rgba(72,138,236,0.09)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-5 w-5" />
           Add document
         </button>
       </div>
@@ -239,10 +239,10 @@ export default function DriverDocumentsPage() {
           <button
             type="button"
             onClick={openAddForm}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900"
+            className="inline-flex items-center gap-3 rounded-lg bg-[#488aec] px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-[0_4px_6px_-1px_rgba(72,138,236,0.19),0_2px_4px_-1px_rgba(72,138,236,0.09)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none"
           >
-            <Upload className="h-4 w-4" />
-            Submit a document
+            <Upload className="h-5 w-5" />
+            Submit
           </button>
         </section>
       ) : (
@@ -390,7 +390,7 @@ export default function DriverDocumentsPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-3 rounded-lg bg-[#488aec] px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-[0_4px_6px_-1px_rgba(72,138,236,0.19),0_2px_4px_-1px_rgba(72,138,236,0.09)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none"
                 >
                   <Upload className="h-4 w-4" />
                   {isSaving ? 'Submitting...' : 'Submit document'}

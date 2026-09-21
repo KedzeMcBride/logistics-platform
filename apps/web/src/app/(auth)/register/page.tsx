@@ -14,7 +14,7 @@ export default function RegisterPage() {
 
       <p className="text-center text-sm text-neutral-500 mt-6">
         Already have an account?{' '}
-        <Link href="/login" className="font-semibold text-emerald-800">
+        <Link href="/login" className="font-semibold text-[#488aec]">
           Sign in
         </Link>
       </p>

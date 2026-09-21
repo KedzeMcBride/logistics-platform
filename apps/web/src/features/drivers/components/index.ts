@@ -6,3 +6,5 @@ export { DriverPerformance } from './driver-performance';
 export { DriverProfileHeader } from './driver-profile-header';
 export { DriverProfileSkeleton } from './driver-profile-skeleton';
 export { DriverStatusCard } from './driver-status-card';
+export { DriverAvailabilityToggle } from './driver-availability-toggle';
+export { DriverActionButton } from './driver-action-button';

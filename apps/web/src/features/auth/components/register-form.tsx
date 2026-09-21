@@ -223,7 +223,7 @@ export function RegisterForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded-lg bg-emerald-800 hover:bg-emerald-900 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-semibold py-3.5 mt-2"
+          className="w-full rounded-lgclassName=inline-flex items-center gap-3 rounded-lg bg-[#488aec] px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-[0_4px_6px_-1px_rgba(72,138,236,0.19),0_2px_4px_-1px_rgba(72,138,236,0.09)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none"
         >
           {isSubmitting ? 'Creating account...' : 'Create account'}
         </button>
