@@ -7,7 +7,7 @@ export default function NewDeliveryPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
       <Link
-        href="/deliveries"
+        href="/customer/deliveries"
         className="mb-6 inline-flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900"
       >
         <ArrowLeft className="h-4 w-4" />

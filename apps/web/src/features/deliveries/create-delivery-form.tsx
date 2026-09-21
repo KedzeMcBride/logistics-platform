@@ -143,9 +143,9 @@ export function CreateDeliveryForm() {
               className={cn(
                 'flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold',
                 i < step
-                  ? 'bg-emerald-800 text-white'
+                  ? 'bg-[#488aec] -800 text-white'
                   : i === step
-                    ? 'bg-emerald-800 text-white'
+                    ? 'bg-[#488aec] -800 text-white'
                     : 'bg-neutral-100 text-neutral-400',
               )}
             >
@@ -186,7 +186,7 @@ export function CreateDeliveryForm() {
           type="button"
           onClick={back}
           disabled={step === 0 || isSubmitting}
-          className="flex items-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-[#488aec] -800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -196,7 +196,7 @@ export function CreateDeliveryForm() {
           <button
             type="button"
             onClick={next}
-            className="flex items-center gap-2 rounded-lg bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900"
+            className="flex items-center gap-2 rounded-lg bg-[#488aec] -800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             Next
             <ArrowRight className="h-4 w-4" />
@@ -206,7 +206,7 @@ export function CreateDeliveryForm() {
             type="button"
             onClick={() => void submit()}
             disabled={isSubmitting}
-            className="flex items-center gap-2 rounded-lg bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:opacity-60"
+            className="w-full rounded-lgclassName=inline-flex items-center gap-3 rounded-lg bg-[#488aec] px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-[0_4px_6px_-1px_rgba(72,138,236,0.19),0_2px_4px_-1px_rgba(72,138,236,0.09)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             Create delivery

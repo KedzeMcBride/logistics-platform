@@ -16,24 +16,39 @@ type NavItem = {
 };
 
 const CUSTOMER_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/deliveries', label: 'Deliveries', icon: Package },
-  { href: '/notifications', label: 'Notifications', icon: Bell, showBadge: true },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/customer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/customer/deliveries', label: 'Deliveries', icon: Package },
+  {
+    href: '/customer/notifications',
+    label: 'Notifications',
+    icon: Bell,
+    showBadge: true,
+  },
+  { href: '/customer/profile', label: 'Profile', icon: User },
 ];
 
 const DRIVER_NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/vehicles', label: 'Vehicles', icon: Car },
-  { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/notifications', label: 'Notifications', icon: Bell, showBadge: true },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/driver/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/driver/vehicles', label: 'Vehicles', icon: Car },
+  { href: '/driver/documents', label: 'Documents', icon: FileText },
+  {
+    href: '/driver/notifications',
+    label: 'Notifications',
+    icon: Bell,
+    showBadge: true,
+  },
+  { href: '/driver/profile', label: 'Profile', icon: User },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/drivers', label: 'Drivers', icon: Car },
-  { href: '/notifications', label: 'Notifications', icon: Bell, showBadge: true },
+  {
+    href: '/notifications',
+    label: 'Notifications',
+    icon: Bell,
+    showBadge: true,
+  },
 ];
 
 export function AppSidebar() {

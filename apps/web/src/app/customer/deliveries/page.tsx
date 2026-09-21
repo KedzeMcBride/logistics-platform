@@ -19,8 +19,8 @@ export default function DeliveriesPage() {
           <p className="mt-1 text-sm text-neutral-500">All your deliveries, active and past.</p>
         </div>
         <Link
-          href="/deliveries/new"
-          className="flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900"
+          href="/customer/deliveries/new"
+          className="flex items-center gap-2 rounded-lg bg-[#488aec] -800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_10px_15px_-3px_rgba(72,138,236,0.31),0_4px_6px_-2px_rgba(72,138,236,0.09)] focus:outline-none focus:ring-2 focus:ring-[#488aec]/40 focus:ring-offset-2 active:translate-y-0 active:opacity-85 active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Plus className="h-4 w-4" />
           New delivery
