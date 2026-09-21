@@ -47,7 +47,7 @@ export function LoginForm() {
           <input
             id="email"
             type="email"
-            placeholder="name@company.com"
+            placeholder="name@email.com"
             value={values.email}
             onChange={handleChange('email')}
             className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-[15px] text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/40 focus:border-emerald-700"

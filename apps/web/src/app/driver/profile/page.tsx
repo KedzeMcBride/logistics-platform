@@ -30,13 +30,9 @@ export default function DriverProfilePage() {
               <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
 
               <div>
-                <h2 className="font-semibold text-red-900">
-                  Unable to load your profile
-                </h2>
+                <h2 className="font-semibold text-red-900">Unable to load your profile</h2>
 
-                <p className="mt-1 text-sm text-red-700">
-                  {error ?? 'Driver profile not found.'}
-                </p>
+                <p className="mt-1 text-sm text-red-700">{error ?? 'Driver profile not found.'}</p>
 
                 <button
                   type="button"
@@ -61,17 +57,13 @@ export default function DriverProfilePage() {
     (document) => document.status === 'PENDING',
   ).length;
 
-  const activeVehicles = driver.vehicles.filter(
-    (vehicle) => vehicle.isActive,
-  ).length;
+  const activeVehicles = driver.vehicles.filter((vehicle) => vehicle.isActive).length;
 
   return (
     <main className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-6">
         <div>
-          <p className="text-sm font-medium text-blue-600">
-            Driver Portal
-          </p>
+          <p className="text-sm font-medium text-blue-600">Driver Portal</p>
 
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
             My Profile
@@ -88,10 +80,7 @@ export default function DriverProfilePage() {
 
         <DriverStatusCard driver={driver} />
 
-        <DriverPerformance
-          driver={driver}
-          activeVehicles={activeVehicles}
-        />
+        <DriverPerformance driver={driver} activeVehicles={activeVehicles} />
 
         <DriverDocumentsVehicles
           driver={driver}
@@ -107,4 +96,3 @@ export default function DriverProfilePage() {
     </main>
   );
 }
-
