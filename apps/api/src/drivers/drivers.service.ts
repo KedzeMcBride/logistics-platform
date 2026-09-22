@@ -261,6 +261,7 @@ export class DriversService {
           vehicles: driver.vehicles.map((vehicle) => ({
             type: vehicle.type,
             plateNumber: vehicle.plateNumber,
+            capacityKg: vehicle.capacityKg,
           })),
         };
       });

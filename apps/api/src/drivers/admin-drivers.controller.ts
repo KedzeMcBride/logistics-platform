@@ -6,6 +6,7 @@ import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '../auth';
 import type { AuthenticatedUser } from '../auth/strategies';
 
 import { DriversService } from './drivers.service';
+import { NearbyDriversQueryDto } from './dto';
 
 class RejectDriverDto {
   @IsOptional()
@@ -28,6 +29,11 @@ export class AdminDriversController {
   @Get('pending')
   listPending() {
     return this.drivers.listPendingApprovals();
+  }
+
+  @Get('nearby')
+  findNearby(@Query() query: NearbyDriversQueryDto) {
+    return this.drivers.findNearby(query);
   }
 
   @Patch(':id/approve')
