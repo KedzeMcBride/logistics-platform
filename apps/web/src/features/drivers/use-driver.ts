@@ -50,6 +50,32 @@ export type DriverProfileDto = {
   };
 };
 
+export type GeolocationCoords = { lat: number; lng: number };
+
+/**
+ * Resolves the browser's current position, or rejects with a readable
+ * message. Used as a best-effort location source — callers decide whether
+ * a failure here should block the surrounding action.
+ */
+export function getBrowserLocation(options?: PositionOptions): Promise<GeolocationCoords> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      reject(new Error('Geolocation is not supported in this browser'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      (err) => {
+        reject(new Error(err.message || 'Unable to determine your location'));
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0, ...options },
+    );
+  });
+}
+
 export function useDriverProfile() {
   const [driver, setDriver] = useState<DriverProfileDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,17 +105,47 @@ export function useDriverProfile() {
     };
   }, [fetch]);
 
-  const setAvailability = useCallback(async (availability: DriverAvailability) => {
-    const updated = await apiClient.patch<DriverProfileDto>(
-      '/drivers/availability',
-      { availability },
-      { auth: true },
+  const setAvailability = useCallback(
+    async (availability: DriverAvailability, location?: GeolocationCoords) => {
+      const updated = await apiClient.patch<DriverProfileDto>(
+        '/drivers/availability',
+        { availability, ...(location ? { lat: location.lat, lng: location.lng } : {}) },
+        { auth: true },
+      );
+      setDriver((prev) =>
+        prev
+          ? {
+              ...prev,
+              availability: updated.availability,
+              currentLat: updated.currentLat,
+              currentLng: updated.currentLng,
+              lastLocationAt: updated.lastLocationAt,
+            }
+          : null,
+      );
+      return updated;
+    },
+    [],
+  );
+
+  const updateLocation = useCallback(async (location: GeolocationCoords) => {
+    const updated = await apiClient.patch<DriverProfileDto>('/drivers/location', location, {
+      auth: true,
+    });
+    setDriver((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentLat: updated.currentLat,
+            currentLng: updated.currentLng,
+            lastLocationAt: updated.lastLocationAt,
+          }
+        : null,
     );
-    setDriver((prev) => (prev ? { ...prev, availability: updated.availability } : null));
     return updated;
   }, []);
 
-  return { driver, isLoading, error, refetch: fetch, setAvailability };
+  return { driver, isLoading, error, refetch: fetch, setAvailability, updateLocation };
 }
 
 // ---------------------------------------------------------------------------

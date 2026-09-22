@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import type { DriverAvailability } from '@repo/shared';
 
-import { DriverAvailabilityToggle, useDriverProfile } from '@/features/drivers';
+import { DriverAvailabilityToggle, getBrowserLocation, useDriverProfile } from '@/features/drivers';
 import { cn } from '@/lib/utils';
 
 export default function DriverDashboardPage() {
@@ -22,7 +22,19 @@ export default function DriverDashboardPage() {
     setAvailabilityError(null);
 
     try {
-      await setAvailability(availability);
+      // Best-effort: capture the driver's current position when going
+      // online so their live location is on file. Going online must not be
+      // blocked if the browser denies or lacks geolocation support.
+      let location: Awaited<ReturnType<typeof getBrowserLocation>> | undefined;
+      if (availability === 'ONLINE') {
+        try {
+          location = await getBrowserLocation();
+        } catch {
+          location = undefined;
+        }
+      }
+
+      await setAvailability(availability, location);
     } catch (err) {
       setAvailabilityError(
         err instanceof Error ? err.message : 'Unable to update your availability.',

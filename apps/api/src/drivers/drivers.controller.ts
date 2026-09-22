@@ -5,7 +5,13 @@ import { CurrentUser, JwtAuthGuard, Roles, RolesGuard } from '../auth';
 import type { AuthenticatedUser } from '../auth/strategies';
 
 import { DriversService } from './drivers.service';
-import { AddDocumentDto, AddVehicleDto, SetAvailabilityDto, UpdateVehicleDto } from './dto';
+import {
+  AddDocumentDto,
+  AddVehicleDto,
+  SetAvailabilityDto,
+  UpdateLocationDto,
+  UpdateVehicleDto,
+} from './dto';
 
 @Controller('drivers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,5 +51,10 @@ export class DriversController {
   @Patch('availability')
   setAvailability(@CurrentUser() user: AuthenticatedUser, @Body() dto: SetAvailabilityDto) {
     return this.drivers.setAvailability(user.id, dto);
+  }
+
+  @Patch('location')
+  updateLocation(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateLocationDto) {
+    return this.drivers.updateLocation(user.id, dto);
   }
 }

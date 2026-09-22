@@ -891,3 +891,178 @@ The Day 11 application code has already been committed separately.
 After committing the final Day 11 documentation update, the project can proceed to **Day 12**.
 
 Day 12 should begin from the completed and tested Day 11 checkpoint rather than modifying the completed Driver Management implementation.
+
+---
+
+# Day 12 — Driver Availability + Location (Roadmap Day 19)
+
+## Overview
+
+Day 12 targeted the "Driver Availability + Location" roadmap goal. Availability
+itself (the ONLINE/OFFLINE toggle, approval/vehicle gating) was already fully
+implemented and verified on Day 11 — inspection at the start of the day
+confirmed this, so it was **not** re-implemented.
+
+What Day 11 did _not_ have was a real location update. `DriversService.setAvailability`
+contained a hard-coded placeholder:
+
+```ts
+// Placeholder location until real GPS updates arrive on Day 15
+const lat = driver.currentLat ?? 0;
+const lng = driver.currentLng ?? 0;
+```
+
+There was no endpoint for a driver to report their actual coordinates. Day 12
+closed that gap: drivers can now persist a real location, going ONLINE can
+carry a fresh position in the same call, and the Redis geo index is kept
+consistent with real, known locations instead of a `0,0` placeholder.
+
+No schema change was required — `DriverProfile.currentLat`, `currentLng`, and
+`lastLocationAt` already existed on the model from Day 9/10.
+
+---
+
+## Completed
+
+### 1. Backend
+
+#### New endpoint
+
+```text
+PATCH /api/v1/drivers/location
+Body: { lat: number, lng: number }
+```
+
+- Validated with `IsLatitude` / `IsLongitude` (same convention as the
+  deliveries DTOs).
+- Persists `currentLat`, `currentLng`, `lastLocationAt` on the driver's own
+  profile.
+- Syncs the Redis geo index (`driver:locations`) only when the driver is
+  currently `ONLINE`; otherwise removes them from the index.
+
+#### Availability + location in one call
+
+`PATCH /api/v1/drivers/availability` now accepts optional `lat`/`lng`
+(paired — both or neither, enforced via `ValidateIf`). This lets the client
+capture the driver's browser location once, at the moment they go online,
+without a second round trip. Existing behavior is preserved:
+
+- Going ONLINE still requires `approvalStatus === APPROVED` and at least one
+  active vehicle (unchanged Day 11 rule).
+- If no fresh coordinates are sent, any previously stored location is left
+  untouched (no more `0,0` placeholder writes).
+- A driver going ONLINE with no location on file yet is kept **out** of the
+  Redis geo index (correct: they can't be found "nearby" if their location
+  isn't actually known).
+- Going OFFLINE always removes the driver from the geo index; their last
+  known location is preserved for display.
+
+#### Files changed
+
+- `apps/api/src/drivers/dto/update-location.dto.ts` (new)
+- `apps/api/src/drivers/dto/set-availability.dto.ts` (optional `lat`/`lng`)
+- `apps/api/src/drivers/dto/index.ts` (export new DTO)
+- `apps/api/src/drivers/drivers.controller.ts` (`PATCH /drivers/location`)
+- `apps/api/src/drivers/drivers.service.ts` (`updateLocation`, rewritten
+  `setAvailability` location handling, shared `syncGeoIndex` helper)
+
+### 2. Frontend
+
+- `apps/web/src/features/drivers/use-driver.ts`
+  - `getBrowserLocation()` — wraps `navigator.geolocation.getCurrentPosition`
+    in a promise, with a clear error when geolocation is unsupported or
+    denied.
+  - `setAvailability()` now accepts an optional `{ lat, lng }` and forwards
+    it to the API; local state is updated with the returned
+    `currentLat`/`currentLng`/`lastLocationAt`.
+  - New `updateLocation()` on the hook — calls `PATCH /drivers/location` and
+    merges the result into local state.
+- `apps/web/src/app/driver/dashboard/page.tsx` — going ONLINE now attempts to
+  capture the browser's current position first. This is **best-effort**: if
+  geolocation is denied, unsupported, or times out, the driver can still go
+  online (the failure is swallowed, not surfaced as a blocking error), since
+  availability must not depend on location permissions.
+- `apps/web/src/app/driver/profile/page.tsx` /
+  `apps/web/src/features/drivers/components/driver-location.tsx` — the "Last
+  Known Location" card now has an "Update location" button that requests a
+  fresh browser position and persists it via `updateLocation()`, with its own
+  loading and error state.
+
+---
+
+## Verification
+
+### Backend
+
+- **Typecheck** (`pnpm --filter @repo/api typecheck`): ✅ Passed, 0 errors.
+- **Build** (`pnpm --filter @repo/api build`, `nest build`): ✅ Passed.
+- **Tests** (`pnpm --filter @repo/api test`): ✅ **5 suites passed, 43/43
+  tests passed** (0 failed), including the new `drivers.service.spec.ts`
+  (integration-style, matching the existing `deliveries.service.spec.ts` /
+  `notifications.service.spec.ts` pattern, with a mocked `RedisService` so
+  the geo-index side effects can be asserted directly). Covers:
+  - `setAvailability` rejects ONLINE for an unapproved driver
+  - `setAvailability` rejects ONLINE with no active vehicle
+  - `setAvailability` rejects a non-driver account
+  - going ONLINE with no location on file yet leaves the driver out of the
+    geo index (`zrem`, no `geoadd`)
+  - going ONLINE with a fresh `lat`/`lng` persists them and calls
+    `redis.geoadd` with the expected key/args
+  - going OFFLINE removes the driver from the geo index
+  - `updateLocation` persists new coordinates and advances `lastLocationAt`
+  - `updateLocation` only calls `geoadd` while the driver is ONLINE
+  - `updateLocation` rejects a non-driver account
+
+  One test-ordering bug was caught and fixed during verification: two
+  `setAvailability` tests shared the same driver fixture and were sensitive
+  to execution order (a test asserting "no location on file yet" ran _after_
+  a test that had already given that driver a real location, so it
+  observed `geoadd` instead of the expected `zrem`). Reordered so the
+  "no location yet" case runs first against a true fresh-state fixture. This
+  was a test-isolation issue only — no production code changed as a result.
+
+### Frontend
+
+- **Browser verification**: went ONLINE from the driver dashboard with
+  location permission granted — `currentLat`/`currentLng` updated and were
+  confirmed visible on the driver profile page's "Last Known Location" card.
+
+No deviations from the implemented code were needed — verification passed
+against the code as written.
+
+---
+
+## Day 12 Status
+
+## COMPLETE
+
+- [x] Inspected Day 11 implementation before starting; confirmed availability
+      was already done and location was the actual gap
+- [x] `PATCH /drivers/location` endpoint implemented
+- [x] `PATCH /drivers/availability` extended to accept an optional location
+- [x] Placeholder `0,0` location logic removed; real Redis geo-index sync
+- [x] Frontend: best-effort geolocation capture on "Go Online"
+- [x] Frontend: explicit "Update location" action on the driver profile page
+- [x] Backend typecheck passed (0 errors)
+- [x] Backend build passed (`nest build`)
+- [x] Backend tests passed — 5/5 suites, 43/43 tests
+- [x] Browser verification: went online with granted location, confirmed
+      `currentLat`/`currentLng` updated on the profile page
+- [ ] Git checkpoint commit — pending (see below)
+
+## Blockers
+
+None outstanding. (Earlier attempt at this work, in a network-sandboxed
+environment, was blocked on Prisma engine binary downloads and could not run
+backend typecheck/test/build; this was an environment limitation, not a code
+defect, and has now been fully resolved by running verification on a normal
+development machine.)
+
+---
+
+# Next Development Step
+
+Day 12 is implemented and verified; a Git checkpoint commit for this work is
+still pending. Once committed, the project can proceed to **Day 13** from
+this checkpoint. Do not re-implement availability or location from scratch —
+build on the `updateLocation` / `syncGeoIndex` foundation added today.

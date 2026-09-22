@@ -8,7 +8,13 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
-import type { AddDocumentDto, AddVehicleDto, SetAvailabilityDto, UpdateVehicleDto } from './dto';
+import type {
+  AddDocumentDto,
+  AddVehicleDto,
+  SetAvailabilityDto,
+  UpdateLocationDto,
+  UpdateVehicleDto,
+} from './dto';
 
 const DRIVER_GEO_KEY = 'driver:locations';
 
@@ -137,31 +143,66 @@ export class DriversService {
       }
     }
 
+    const goingOnline = dto.availability === 'ONLINE';
+    const hasFreshLocation = dto.lat !== undefined && dto.lng !== undefined;
+
     const updated = await this.prisma.driverProfile.update({
       where: { id: driver.id },
       data: {
         availability: dto.availability,
-        lastLocationAt: dto.availability === 'ONLINE' ? new Date() : undefined,
+        ...(hasFreshLocation
+          ? { currentLat: dto.lat, currentLng: dto.lng, lastLocationAt: new Date() }
+          : {}),
       },
     });
 
-    // Sync Redis geo index
+    await this.syncGeoIndex(driver.id, goingOnline, updated.currentLat, updated.currentLng);
+
+    return updated;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Location
+  // ---------------------------------------------------------------------------
+
+  async updateLocation(userId: string, dto: UpdateLocationDto) {
+    const driver = await this.getDriverOrThrow(userId);
+
+    const updated = await this.prisma.driverProfile.update({
+      where: { id: driver.id },
+      data: {
+        currentLat: dto.lat,
+        currentLng: dto.lng,
+        lastLocationAt: new Date(),
+      },
+    });
+
+    await this.syncGeoIndex(driver.id, updated.availability === 'ONLINE', dto.lat, dto.lng);
+
+    return updated;
+  }
+
+  /**
+   * Keeps the Redis geo index in sync with a driver's current online/offline
+   * state and known location. Drivers are only discoverable for nearby
+   * searches while ONLINE and while a real location is on file; otherwise
+   * they are removed from the index.
+   */
+  private async syncGeoIndex(
+    driverId: string,
+    isOnline: boolean,
+    lat: number | null,
+    lng: number | null,
+  ): Promise<void> {
     try {
-      if (dto.availability === 'ONLINE') {
-        // Placeholder location until real GPS updates arrive on Day 15
-        const lat = driver.currentLat ?? 0;
-        const lng = driver.currentLng ?? 0;
-        if (lat !== 0 && lng !== 0) {
-          await this.redis.client.geoadd(DRIVER_GEO_KEY, lng, lat, driver.id);
-        }
+      if (isOnline && lat !== null && lng !== null) {
+        await this.redis.client.geoadd(DRIVER_GEO_KEY, lng, lat, driverId);
       } else {
-        await this.redis.client.zrem(DRIVER_GEO_KEY, driver.id);
+        await this.redis.client.zrem(DRIVER_GEO_KEY, driverId);
       }
     } catch {
       // Redis failure shouldn't block the DB update
     }
-
-    return updated;
   }
 
   // ---------------------------------------------------------------------------

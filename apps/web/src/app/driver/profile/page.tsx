@@ -12,10 +12,10 @@ import {
   DriverProfileSkeleton,
   DriverStatusCard,
 } from '@/features/drivers/components';
-import { useDriverProfile } from '@/features/drivers/use-driver';
+import { getBrowserLocation, useDriverProfile } from '@/features/drivers/use-driver';
 
 export default function DriverProfilePage() {
-  const { driver, isLoading, error, refetch } = useDriverProfile();
+  const { driver, isLoading, error, refetch, updateLocation } = useDriverProfile();
 
   if (isLoading) {
     return <DriverProfileSkeleton />;
@@ -89,7 +89,13 @@ export default function DriverProfilePage() {
           activeVehicles={activeVehicles}
         />
 
-        <DriverLocation driver={driver} />
+        <DriverLocation
+          driver={driver}
+          onRefreshLocation={async () => {
+            const coords = await getBrowserLocation();
+            await updateLocation(coords);
+          }}
+        />
 
         <DriverAccountTimeline driver={driver} />
       </div>

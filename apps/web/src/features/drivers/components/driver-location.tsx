@@ -1,22 +1,69 @@
 'use client';
 
-import { MapPin } from 'lucide-react';
+import { LoaderCircle, MapPin } from 'lucide-react';
+import { useState } from 'react';
 
 import type { DriverProfileDto } from '@/features/drivers/use-driver';
 
 type DriverLocationProps = {
   driver: DriverProfileDto;
+  /** Requests a fresh browser location and persists it. Optional so the
+   * component still renders read-only in contexts without geolocation
+   * wiring (e.g. future admin views of another driver's profile). */
+  onRefreshLocation?: () => Promise<unknown>;
 };
 
-export function DriverLocation({ driver }: DriverLocationProps) {
+export function DriverLocation({ driver, onRefreshLocation }: DriverLocationProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
   const hasLocation = driver.currentLat !== null && driver.currentLng !== null;
+
+  async function handleRefresh() {
+    if (!onRefreshLocation || isRefreshing) return;
+
+    setIsRefreshing(true);
+    setRefreshError(null);
+
+    try {
+      await onRefreshLocation();
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : 'Unable to update your location');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-      <SectionHeader
-        title="Last Known Location"
-        description="Your most recently recorded driver location."
-      />
+      <div className="flex items-start justify-between gap-4">
+        <SectionHeader
+          title="Last Known Location"
+          description="Your most recently recorded driver location."
+        />
+
+        {onRefreshLocation && (
+          <button
+            type="button"
+            onClick={() => void handleRefresh()}
+            disabled={isRefreshing}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isRefreshing ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <MapPin className="h-4 w-4" />
+            )}
+            {isRefreshing ? 'Updating…' : 'Update location'}
+          </button>
+        )}
+      </div>
+
+      {refreshError && (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {refreshError}
+        </p>
+      )}
 
       <div className="mt-6">
         {hasLocation ? (
