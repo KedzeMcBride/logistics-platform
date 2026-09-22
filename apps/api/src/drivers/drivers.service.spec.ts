@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 
@@ -13,16 +17,19 @@ describe('DriversService (integration)', () => {
   let prisma: PrismaService;
   let redisGeoadd: jest.Mock;
   let redisZrem: jest.Mock;
+  let redisGeosearch: jest.Mock;
 
   let approvedDriverUserId: string;
   let approvedDriverId: string;
   let unapprovedDriverUserId: string;
   let noVehicleDriverUserId: string;
+  let noVehicleDriverId: string;
 
   const mockRedisService = {
     client: {
       geoadd: jest.fn().mockResolvedValue(1),
       zrem: jest.fn().mockResolvedValue(1),
+      geosearch: jest.fn(),
     },
   };
 
@@ -40,6 +47,7 @@ describe('DriversService (integration)', () => {
     prisma = module.get(PrismaService);
     redisGeoadd = mockRedisService.client.geoadd;
     redisZrem = mockRedisService.client.zrem;
+    redisGeosearch = mockRedisService.client.geosearch;
     await prisma.$connect();
 
     // Approved driver, with one active vehicle — eligible to go ONLINE.
@@ -82,8 +90,10 @@ describe('DriversService (integration)', () => {
           },
         },
       },
+      include: { driverProfile: true },
     });
     noVehicleDriverUserId = noVehicleUser.id;
+    noVehicleDriverId = noVehicleUser.driverProfile!.id;
 
     // Unapproved driver — not eligible to go ONLINE regardless of vehicles.
     const unapprovedUser = await prisma.user.create({
@@ -105,6 +115,7 @@ describe('DriversService (integration)', () => {
   afterEach(() => {
     redisGeoadd.mockClear();
     redisZrem.mockClear();
+    redisGeosearch.mockReset();
   });
 
   afterAll(async () => {
@@ -217,6 +228,102 @@ describe('DriversService (integration)', () => {
       await expect(
         service.updateLocation('00000000-0000-0000-0000-000000000000', { lat: 4.0, lng: 9.0 }),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('findNearby', () => {
+    beforeAll(async () => {
+      // Don't rely on whatever state earlier describe blocks left this
+      // driver in — pin it explicitly so these tests are self-contained.
+      await service.setAvailability(approvedDriverUserId, {
+        availability: 'ONLINE',
+        lat: 4.1591,
+        lng: 9.2417,
+      });
+    });
+
+    it('returns matched drivers, nearest first, with active vehicles included', async () => {
+      redisGeosearch.mockResolvedValue([
+        [approvedDriverId, '0.2133', ['9.24169868230819702', '4.15910101638305463']],
+      ]);
+
+      const results = await service.findNearby({ lat: 4.16, lng: 9.24 });
+
+      expect(redisGeosearch).toHaveBeenCalledWith(
+        'driver:locations',
+        'FROMLONLAT',
+        9.24,
+        4.16,
+        'BYRADIUS',
+        5, // default radiusKm
+        'km',
+        'ASC',
+        'COUNT',
+        20, // default limit
+        'WITHCOORD',
+        'WITHDIST',
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!).toMatchObject({
+        driverId: approvedDriverId,
+        fullName: 'Approved Driver',
+        distanceKm: 0.2133,
+      });
+      expect(results[0]!.vehicles.length).toBeGreaterThan(0);
+    });
+
+    it('respects a custom radius and limit', async () => {
+      redisGeosearch.mockResolvedValue([]);
+
+      await service.findNearby({ lat: 4.16, lng: 9.24, radiusKm: 2, limit: 5 });
+
+      expect(redisGeosearch).toHaveBeenCalledWith(
+        'driver:locations',
+        'FROMLONLAT',
+        9.24,
+        4.16,
+        'BYRADIUS',
+        2,
+        'km',
+        'ASC',
+        'COUNT',
+        5,
+        'WITHCOORD',
+        'WITHDIST',
+      );
+    });
+
+    it('returns an empty array when nothing is nearby', async () => {
+      redisGeosearch.mockResolvedValue([]);
+
+      const results = await service.findNearby({ lat: 4.16, lng: 9.24 });
+
+      expect(results).toEqual([]);
+    });
+
+    it('filters out a stale index entry whose driver is no longer ONLINE in the database', async () => {
+      // Simulates a Redis entry that wasn't cleaned up (e.g. a transient
+      // zrem failure) — the driver is present in the geo index but is
+      // actually OFFLINE (and has no vehicle) in Postgres, which remains
+      // the source of truth.
+      redisGeosearch.mockResolvedValue([
+        [approvedDriverId, '0.5', ['9.24', '4.16']],
+        [noVehicleDriverId, '0.8', ['9.25', '4.17']],
+      ]);
+
+      const results = await service.findNearby({ lat: 4.16, lng: 9.24 });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.driverId).toBe(approvedDriverId);
+    });
+
+    it('surfaces a clear error when Redis is unavailable', async () => {
+      redisGeosearch.mockRejectedValue(new Error('connection refused'));
+
+      await expect(service.findNearby({ lat: 4.16, lng: 9.24 })).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
     });
   });
 });

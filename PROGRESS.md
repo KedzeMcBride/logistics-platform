@@ -1066,3 +1066,386 @@ Day 12 is implemented and verified; a Git checkpoint commit for this work is
 still pending. Once committed, the project can proceed to **Day 13** from
 this checkpoint. Do not re-implement availability or location from scratch —
 build on the `updateLocation` / `syncGeoIndex` foundation added today.
+
+# Day 13 — Nearby Drivers Query (Roadmap Day 20)
+
+Overview
+
+## Day 13 targeted the Nearby Drivers Query roadmap goal.
+
+The objective was to add a backend-only nearby-driver discovery capability
+using the project's existing Redis GEO/driver-location architecture, while
+preserving the existing authorization rules and PostgreSQL source of truth.
+
+No frontend UI was required or changed for this roadmap item.
+
+Daily goal
+
+Implement and verify the nearby-driver query using the project's intended
+geo/Redis approach and define/test query constraints from the existing
+architecture.
+
+Scope Completed
+
+Files changed
+
+5 files total:
+
+- apps/api/src/drivers/dto/nearby-drivers.dto.ts — new
+
+- apps/api/src/drivers/dto/index.ts — modified
+
+- apps/api/src/drivers/admin-drivers.controller.ts — modified
+
+- apps/api/src/drivers/drivers.service.ts — modified
+
+- apps/api/src/drivers/drivers.service.spec.ts — modified
+
+No frontend files were changed because the roadmap scope was the backend
+query capability only.
+
+Nearby Drivers Endpoint
+
+Route
+
+- GET /api/v1/admin/drivers/nearby?lat=&lng=&radiusKm=&limit=
+
+Authorization
+
+The endpoint is protected by the existing:
+
+`JwtAuthGuard`
+
+`RolesGuard`
+
+Allowed roles:
+
+`ADMIN`
+
+`OPERATIONS_MANAGER`
+
+Existing authorization rules were preserved.
+
+Query parameters
+
+Parameter
+
+Required
+
+Default
+
+Constraints
+
+lat
+
+Yes
+
+—
+
+Valid latitude
+
+lng
+
+Yes
+
+—
+
+Valid longitude
+
+radiusKm
+
+No
+
+5
+
+0.1–50
+
+limit
+
+No
+
+20
+
+1–50
+
+- The DTO uses class-transformer numeric conversion and
+  class-validator constraints.
+
+## Implementation
+
+Redis GEOSEARCH
+
+- Nearby discovery uses the existing Redis GEO index:
+
+- driver:locations
+
+- The service performs a Redis GEOSEARCH using:
+
+- query longitude/latitude
+
+- configurable radius in kilometres
+
+- nearest-first ordering
+
+- configurable result limit
+
+- distance output
+
+- coordinate output
+
+The result parser converts Redis GEOSEARCH results into typed nearby-driver
+matches.
+
+PostgreSQL source of truth
+
+Redis is used for spatial discovery, but PostgreSQL remains the source of
+truth for driver availability.
+
+The service:
+
+Finds nearby driver IDs through Redis.
+
+Queries PostgreSQL for those IDs.
+
+Requires availability: ONLINE.
+
+Includes active vehicles.
+
+Rebuilds the response in Redis's nearest-first order.
+
+This prevents stale Redis entries from surfacing drivers who are no longer
+online.
+
+Geo-index synchronization
+
+The existing Day 12 syncGeoIndex() foundation was preserved:
+
+Online + valid coordinates → GEOADD
+
+Online + no coordinates → ZREM
+
+Offline → ZREM
+
+Redis synchronization failures remain non-blocking for database updates.
+
+Returned Data
+
+For each nearby online driver, the service returns:
+
+Driver ID
+
+Full name
+
+Rating
+
+Distance in kilometres
+
+Current latitude
+
+Current longitude
+
+Active vehicles
+
+Vehicle type
+
+Vehicle plate number
+
+Nearest drivers remain first in the returned list.
+
+Tests
+
+The Day 13 driver-service test suite covers:
+
+Availability / geo-index regression coverage
+
+Unapproved driver cannot go online.
+
+Driver without an active vehicle cannot go online.
+
+Non-driver access is rejected.
+
+Going online without a location removes the driver from the GEO index.
+
+Going online with a fresh location adds the driver to the GEO index.
+
+Going offline removes the driver from the GEO index.
+
+Location updates persist coordinates and lastLocationAt.
+
+Location updates synchronize the GEO index only while online.
+
+Nearby-driver query coverage
+
+Nearby drivers are returned nearest-first.
+
+Default radius of 5 km is used.
+
+Default limit of 20 is used.
+
+Custom radius is respected.
+
+Custom limit is respected.
+
+Empty nearby results return correctly.
+
+Stale Redis entries are filtered through PostgreSQL.
+
+Redis GEO query failure results in ServiceUnavailableException.
+
+Verification
+
+API typecheck
+
+Command:
+
+pnpm --filter @repo/api typecheck
+
+Result:
+
+PASSED
+
+tsc --noEmit completed without errors.
+
+The earlier Day 12 Prisma-generation/typecheck blocker is no longer present
+in the final Day 13 verification run.
+
+API tests
+
+Command:
+
+pnpm --filter @repo/api test
+
+Result:
+
+PASS `src/drivers/drivers.service.spec.ts`
+PASS `src/deliveries/deliveries.service.spec.ts`
+PASS `src/auth/auth.service.spec.ts`
+PASS `src/deliveries/pricing.service.spec.ts`
+PASS `src/notifications/notifications.service.spec.ts`
+
+Test Suites: 5 passed, 5 total
+Tests: 48 passed, 48 total
+Snapshots: 0 total
+Time: 15.975 s
+
+Result: 48/48 tests passed.
+
+API build
+
+Command:
+
+pnpm --filter @repo/api build
+
+Result:
+
+PASSED
+
+nest build completed successfully.
+
+Lint
+
+Previously verified during Day 13 implementation:
+
+PASSED
+
+No new lint errors or warnings were introduced by the Day 13 changes.
+
+Day 13 Acceptance Checklist
+
+Inspect current implementation and Git state before coding
+
+List exact files/modules/routes/services that need to change
+
+Implement nearby-driver query
+
+Preserve existing architecture
+
+Preserve authorization rules
+
+Define and validate query constraints
+
+Use Redis GEOSEARCH
+
+Return nearest-first results
+
+Cross-check Redis results against PostgreSQL
+
+Filter stale Redis entries
+
+Preserve geo-index synchronization behavior
+
+Test happy path
+
+Test relevant failure/edge paths
+
+Run API typecheck
+
+Run API tests
+
+Run API build
+
+Verify lint status
+
+Update PROGRESS.md
+
+Create Git checkpoint
+
+Day 13 Status
+
+## COMPLETE — READY FOR GIT CHECKPOINT
+
+The Day 13 implementation and verification requirements are satisfied.
+
+Verification summary
+
+Area
+
+Result
+
+Nearby Drivers Query
+
+✅ Implemented
+
+Authorization
+
+✅ Preserved
+
+Query validation
+
+✅ Passed
+
+Redis GEOSEARCH
+
+✅ Implemented
+
+PostgreSQL availability cross-check
+
+✅ Implemented
+
+Stale Redis filtering
+
+✅ Tested
+
+Geo-index synchronization
+
+✅ Tested
+
+API typecheck
+
+✅ Passed
+
+API tests
+
+✅ 48/48 passed
+
+API build
+
+✅ Passed
+
+Lint
+
+✅ Clean
+
+PROGRESS.md
+
+✅ Updated

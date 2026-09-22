@@ -3,3 +3,4 @@ export * from './add-vehicle.dto';
 export * from './update-vehicle.dto';
 export * from './set-availability.dto';
 export * from './update-location.dto';
+export * from './nearby-drivers.dto';

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,12 +12,20 @@ import { RedisService } from '../redis/redis.service';
 import type {
   AddDocumentDto,
   AddVehicleDto,
+  NearbyDriversQueryDto,
   SetAvailabilityDto,
   UpdateLocationDto,
   UpdateVehicleDto,
 } from './dto';
 
 const DRIVER_GEO_KEY = 'driver:locations';
+
+type NearbyMatch = {
+  driverId: string;
+  distanceKm: number;
+  lat: number;
+  lng: number;
+};
 
 @Injectable()
 export class DriversService {
@@ -180,6 +189,96 @@ export class DriversService {
     await this.syncGeoIndex(driver.id, updated.availability === 'ONLINE', dto.lat, dto.lng);
 
     return updated;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Nearby search
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Finds ONLINE drivers within `radiusKm` of a point, nearest first.
+   *
+   * Redis (`GEOSEARCH` against the `driver:locations` index maintained by
+   * `syncGeoIndex`) does the geospatial scan — that's the fast path this
+   * index exists for. Postgres remains the source of truth for who is
+   * actually still online: an index entry can go stale (e.g. a driver went
+   * offline while a `zrem` transiently failed — see `syncGeoIndex`), so the
+   * matched IDs are re-checked against `driverProfile.availability` before
+   * being returned. A driver dropped by that check simply doesn't appear in
+   * the results; it isn't an error.
+   */
+  async findNearby(query: NearbyDriversQueryDto) {
+    const radiusKm = query.radiusKm ?? 5;
+    const limit = query.limit ?? 20;
+
+    let matches: NearbyMatch[];
+    try {
+      const raw = await this.redis.client.geosearch(
+        DRIVER_GEO_KEY,
+        'FROMLONLAT',
+        query.lng,
+        query.lat,
+        'BYRADIUS',
+        radiusKm,
+        'km',
+        'ASC',
+        'COUNT',
+        limit,
+        'WITHCOORD',
+        'WITHDIST',
+      );
+      matches = this.parseGeosearchResults(raw);
+    } catch {
+      throw new ServiceUnavailableException('Unable to search for nearby drivers right now');
+    }
+
+    if (matches.length === 0) return [];
+
+    const drivers = await this.prisma.driverProfile.findMany({
+      where: {
+        id: { in: matches.map((m) => m.driverId) },
+        availability: 'ONLINE',
+      },
+      include: {
+        vehicles: { where: { isActive: true } },
+      },
+    });
+    const driverById = new Map(drivers.map((driver) => [driver.id, driver]));
+
+    // `matches` is already nearest-first from GEOSEARCH ASC; filtering
+    // preserves that order.
+    return matches
+      .filter((match) => driverById.has(match.driverId))
+      .map((match) => {
+        const driver = driverById.get(match.driverId)!;
+        return {
+          driverId: driver.id,
+          fullName: driver.fullName,
+          rating: driver.rating,
+          distanceKm: match.distanceKm,
+          lat: match.lat,
+          lng: match.lng,
+          vehicles: driver.vehicles.map((vehicle) => ({
+            type: vehicle.type,
+            plateNumber: vehicle.plateNumber,
+          })),
+        };
+      });
+  }
+
+  private parseGeosearchResults(raw: unknown): NearbyMatch[] {
+    if (!Array.isArray(raw)) return [];
+
+    return raw.map((entry) => {
+      const [driverId, distance, coords] = entry as [string, string, [string, string]];
+      const [lng, lat] = coords;
+      return {
+        driverId,
+        distanceKm: Number(distance),
+        lat: Number(lat),
+        lng: Number(lng),
+      };
+    });
   }
 
   /**
