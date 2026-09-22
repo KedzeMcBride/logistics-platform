@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AssignmentQueueService } from '../queue';
 
 import { DeliveriesService } from './deliveries.service';
 import { PricingService } from './pricing.service';
@@ -13,6 +14,10 @@ describe('DeliveriesService (integration)', () => {
   let prisma: PrismaService;
   let customerUserId: string;
   let customerProfileId: string;
+
+  const mockAssignmentQueue = {
+    enqueueAssignment: jest.fn().mockResolvedValue(undefined),
+  };
 
   const CREATE_INPUT = {
     pickupAddress: '100 Test St',
@@ -32,7 +37,12 @@ describe('DeliveriesService (integration)', () => {
   beforeAll(async () => {
     module = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] })],
-      providers: [DeliveriesService, PricingService, PrismaService],
+      providers: [
+        DeliveriesService,
+        PricingService,
+        PrismaService,
+        { provide: AssignmentQueueService, useValue: mockAssignmentQueue },
+      ],
     }).compile();
 
     service = module.get(DeliveriesService);
@@ -51,6 +61,11 @@ describe('DeliveriesService (integration)', () => {
 
     customerUserId = user.id;
     customerProfileId = user.customerProfile!.id;
+  });
+
+  afterEach(() => {
+    mockAssignmentQueue.enqueueAssignment.mockClear();
+    mockAssignmentQueue.enqueueAssignment.mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -78,6 +93,27 @@ describe('DeliveriesService (integration)', () => {
       expect(confirmed.status).toBe('CONFIRMED');
       expect(confirmed.confirmedAt).toBeInstanceOf(Date);
       expect(confirmed.statusHistory).toHaveLength(2);
+    });
+
+    it('enqueues a driver-assignment job when a delivery is confirmed', async () => {
+      const created = await service.create(customerUserId, CREATE_INPUT);
+      await service.confirm(customerUserId, created.id);
+
+      expect(mockAssignmentQueue.enqueueAssignment).toHaveBeenCalledWith(created.id);
+    });
+
+    it('still confirms the delivery even if the assignment queue is unreachable', async () => {
+      mockAssignmentQueue.enqueueAssignment.mockRejectedValueOnce(
+        new Error('connect ECONNREFUSED'),
+      );
+
+      const created = await service.create(customerUserId, CREATE_INPUT);
+      const confirmed = await service.confirm(customerUserId, created.id);
+
+      // Confirmation is not rolled back by a queue outage — it's a
+      // best-effort side effect, same as the Redis geo-index sync pattern
+      // used elsewhere in the codebase.
+      expect(confirmed.status).toBe('CONFIRMED');
     });
 
     it('rejects confirming a non-PENDING delivery', async () => {

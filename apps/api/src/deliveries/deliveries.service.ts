@@ -2,12 +2,14 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { DeliveryStatus } from '@prisma/client';
 import { Role } from '@repo/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AssignmentQueueService } from '../queue';
 
 import type {
   CancelDeliveryDto,
@@ -21,9 +23,12 @@ const CANCELLABLE_STATUSES: DeliveryStatus[] = ['PENDING', 'CONFIRMED', 'SEARCHI
 
 @Injectable()
 export class DeliveriesService {
+  private readonly logger = new Logger(DeliveriesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
+    private readonly assignmentQueue: AssignmentQueueService,
   ) {}
 
   async quote(dto: QuoteDeliveryDto) {
@@ -159,7 +164,28 @@ export class DeliveriesService {
       throw new BadRequestException(`Cannot confirm a delivery in status ${delivery.status}`);
     }
 
-    return this.transition(deliveryId, 'PENDING', 'CONFIRMED', userId, 'Customer confirmed');
+    const updated = await this.transition(
+      deliveryId,
+      'PENDING',
+      'CONFIRMED',
+      userId,
+      'Customer confirmed',
+    );
+
+    // Kick off driver search asynchronously. This mirrors the Redis
+    // geo-index sync pattern in DriversService: a queue/Redis outage must
+    // not stop the customer's confirmation from going through — the
+    // delivery is simply left in CONFIRMED for an operator to dispatch
+    // manually (or for a retry/backfill later) if enqueueing fails.
+    try {
+      await this.assignmentQueue.enqueueAssignment(deliveryId);
+    } catch (err) {
+      this.logger.error(
+        `Failed to enqueue driver assignment for delivery ${deliveryId}: ${(err as Error).message}`,
+      );
+    }
+
+    return updated;
   }
 
   async cancel(userId: string, deliveryId: string, dto: CancelDeliveryDto) {

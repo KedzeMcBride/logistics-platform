@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { AssignmentQueueService } from '../queue';
 import { RedisService } from '../redis/redis.service';
 
 @Controller('health')
@@ -8,6 +9,7 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly assignmentQueue: AssignmentQueueService,
   ) {}
 
   @Get()
@@ -17,6 +19,7 @@ export class HealthController {
       timestamp: new Date().toISOString(),
       db: 'unknown' as 'ok' | 'error' | 'unknown',
       redis: 'unknown' as 'ok' | 'error' | 'unknown',
+      queue: 'unknown' as 'ok' | 'error' | 'unknown',
     };
 
     try {
@@ -35,6 +38,9 @@ export class HealthController {
       result.redis = 'error';
       result.status = 'error';
     }
+
+    result.queue = (await this.assignmentQueue.isHealthy()) ? 'ok' : 'error';
+    if (result.queue === 'error') result.status = 'error';
 
     return result;
   }

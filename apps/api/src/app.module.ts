@@ -5,12 +5,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth';
 import { DeliveriesModule } from './deliveries';
+import { DriversModule } from './drivers';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications';
 import { PrismaModule } from './prisma/prisma.module';
+import { QueueModule } from './queue';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
-import { DriversModule } from './drivers';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DriversModule } from './drivers';
     }),
     PrismaModule,
     RedisModule,
+    QueueModule,
     HealthModule,
     AuthModule,
     UsersModule,
