@@ -1573,3 +1573,168 @@ BLOCKED (environment, not code): prisma generate cannot download its query-engin
 Next Development Step
 
 Day 14's assignment-queue infrastructure is implemented and verified to the extent this sandbox allows. Before starting the next roadmap day: run pnpm --filter @repo/api typecheck && pnpm --filter @repo/api build && pnpm --filter @repo/api test on a normal dev machine to close out the Prisma-dependent verification above, and do a live API check (confirm a delivery with an ONLINE driver seeded nearby, watch it reach DRIVER_ASSIGNED). Build on today's AssignmentQueueService / AssignmentProcessor foundation rather than re-implementing — in particular, any future "smarter" driver-matching logic (ratings, vehicle capacity, etc.) belongs inside AssignmentProcessor.process, and any new job types belong in apps/api/src/queue/.
+
+@'
+
+# Day 15 - Roadmap Day 22: Assignment Service v1 (Rule-Based)
+
+**Target date:** Friday, 25 September 2026
+
+**Status:** COMPLETE
+
+## Daily Goal
+
+Implement Assignment Service v1 using the repository's existing driver and delivery state model. The first rule-based assignment flow was implemented with vehicle capacity eligibility and relevant validation and failure paths.
+
+## Implementation
+
+Implemented the first rule-based assignment service using the existing `DriversService.findNearby()` capability and the Day 14 assignment queue foundation.
+
+Assignment flow now:
+
+1. Receives an assignment request for a delivery.
+2. Obtains nearby eligible drivers.
+3. Evaluates vehicle capacity against the delivery package weight.
+4. Treats a vehicle with `capacityKg: null` as having no explicit capacity restriction.
+5. Excludes vehicles whose declared capacity is below the package weight.
+6. Selects an eligible nearby driver.
+7. Assigns the driver to the delivery using the existing delivery/assignment state model.
+8. Preserves existing authorization and service boundaries.
+
+The implementation is capacity-aware without changing the existing Prisma schema. The existing `Vehicle.capacityKg Float?` field is used as the source of truth.
+
+## Rule-Based Capacity Logic
+
+A vehicle is eligible when:
+
+- `capacityKg` is `null`, meaning no explicit capacity limit is declared; or
+- `capacityKg >= packageWeightKg`.
+
+Vehicles with a declared capacity below the package weight are excluded.
+
+This allows the assignment service to make a basic rule-based decision while leaving more advanced matching criteria for future roadmap work.
+
+## Files / Modules
+
+Relevant Day 15 implementation includes:
+
+- `apps/api/src/assignment/assignment.service.ts`
+- `apps/api/src/assignment/assignment.service.spec.ts`
+- `apps/api/src/drivers/drivers.service.ts`
+- Existing driver DTO/type definitions supporting `capacityKg`
+- Existing Prisma `Vehicle.capacityKg` field in `packages/database/prisma/schema.prisma`
+
+No Prisma schema change was required.
+
+## Verification
+
+### API typecheck
+
+Command:
+
+`pnpm --filter @repo/api typecheck`
+
+Result:
+
+PASS - no TypeScript errors.
+
+### Web typecheck
+
+Command:
+
+`pnpm --filter @repo/web typecheck`
+
+Result:
+
+PASS - no TypeScript errors.
+
+### API tests
+
+Command:
+
+`pnpm --filter @repo/api test`
+
+Result:
+
+PASS - 8 test suites, 79 tests passed, 0 failures.
+
+Assignment coverage includes:
+
+- successful driver assignment
+- capacity-aware driver selection
+- vehicle below package weight
+- vehicle with sufficient capacity
+- vehicle with `capacityKg: null`
+- no-driver failure/retry behavior
+- assignment processor retry handling
+- cancelled/deleted delivery handling
+- queue failure handling
+
+The ERROR log messages for "no drivers" and `ECONNREFUSED` are expected test scenarios and do not represent failing tests. All 79 tests passed.
+
+### API build
+
+Command:
+
+`pnpm --filter @repo/api build`
+
+Result:
+
+PASS - NestJS production build completed successfully.
+
+### Web build
+
+Command:
+
+`pnpm --filter @repo/web build`
+
+Result:
+
+PASS - Next.js production build completed successfully.
+
+- Compilation passed
+- Linting passed
+- Type validation passed
+- 16/16 static pages generated successfully
+
+## Git Checkpoint
+
+Day 15 implementation checkpoint:
+
+`eb988fe feat: add capacity-aware driver assignment`
+
+Working tree was clean before the documentation update.
+
+A final documentation checkpoint will be created after this PROGRESS.md update.
+
+## Blockers
+
+None.
+
+The previously documented Prisma-engine network restriction is not blocking Day 15 verification on the current development machine. API typecheck, API build, full API tests, and web build all pass.
+
+## Acceptance Checklist
+
+- Inspected current implementation and Git state before completing Day 15
+- Implemented Assignment Service v1
+- Preserved existing architecture
+- Preserved existing authorization rules
+- Implemented rule-based vehicle capacity matching
+- Tested successful assignment
+- Tested relevant capacity failure/edge cases
+- Tested no-driver/retry behavior
+- API typecheck passes
+- Web typecheck passes
+- API tests pass: 79/79
+- API build passes
+- Web build passes
+- Web lint/type validation passes
+- Updated PROGRESS.md
+- Git checkpoint exists
+- No unresolved blocker
+
+## Next Development Step
+
+Proceed to the next roadmap day using the existing AssignmentService and AssignmentProcessor foundation. More advanced driver matching rules should be added incrementally without replacing the existing assignment architecture.
+
+'@ | Add-Content -Path PROGRESS.md -Encoding UTF8
