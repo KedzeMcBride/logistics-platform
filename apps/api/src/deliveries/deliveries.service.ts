@@ -10,6 +10,8 @@ import { Role } from '@repo/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignmentQueueService } from '../queue';
+import { AssignmentService } from '../assignment';
+import { DriversService } from '../drivers';
 
 import type {
   CancelDeliveryDto,
@@ -29,6 +31,8 @@ export class DeliveriesService {
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
     private readonly assignmentQueue: AssignmentQueueService,
+    private readonly assignmentService: AssignmentService,
+    private readonly driversService: DriversService,
   ) {}
 
   async quote(dto: QuoteDeliveryDto) {
@@ -228,6 +232,18 @@ export class DeliveriesService {
       where: { id: deliveryId },
       include: { statusHistory: { orderBy: { createdAt: 'asc' } } },
     });
+  }
+
+  async acceptAssignment(userId: string, deliveryId: string) {
+    const driver = await this.driversService.getMe(userId);
+
+    return this.assignmentService.acceptAssignment(deliveryId, driver.id);
+  }
+
+  async rejectAssignment(userId: string, deliveryId: string, reason?: string) {
+    const driver = await this.driversService.getMe(userId);
+
+    return this.assignmentService.rejectAssignment(deliveryId, driver.id, reason);
   }
 
   private async buildScopeFilter(userId: string, role: Role, status?: DeliveryStatus) {

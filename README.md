@@ -42,3 +42,9 @@ admin operations, and AI-assisted dispatch.
 
 A real-time logistics and delivery platform with live tracking, driver assignment,
 admin operations, and AI-assisted dispatch.
+
+pnpm --filter @repo/database prisma migrate dev --name driver_response_tracking
+pnpm --filter @repo/api typecheck
+pnpm --filter @repo/api lint
+pnpm --filter @repo/api test
+pnpm --filter @repo/api build

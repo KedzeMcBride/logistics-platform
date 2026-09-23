@@ -261,7 +261,10 @@ model Delivery {
   estimatedPrice       Decimal? @db.Decimal(10, 2)
   finalPrice           Decimal? @db.Decimal(10, 2)
 
-  assignmentAttempts   Int      @default(0)
+  assignmentAttempts      Int      @default(0)
+  driverResponseDeadline  DateTime?
+  driverRespondedAt       DateTime?
+
   cancelledById        String?
   cancelledBy          User?    @relation("CancelledByUser", fields: [cancelledById], references: [id])
   cancelledReason      String?
