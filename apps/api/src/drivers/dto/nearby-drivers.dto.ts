@@ -43,4 +43,3 @@ export class NearbyDriversQueryDto {
   @IsUUID('4', { each: true })
   excludeDriverIds?: string[];
 }
-

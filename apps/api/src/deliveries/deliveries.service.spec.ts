@@ -173,11 +173,7 @@ describe('DeliveriesService (integration)', () => {
 
     it('returns 404 for a missing delivery', async () => {
       await expect(
-        service.detail(
-          customerUserId,
-          'CUSTOMER',
-          '00000000-0000-0000-0000-000000000000',
-        ),
+        service.detail(customerUserId, 'CUSTOMER', '00000000-0000-0000-0000-000000000000'),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 

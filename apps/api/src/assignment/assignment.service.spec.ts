@@ -174,9 +174,7 @@ describe('AssignmentService', () => {
     });
 
     it('treats a vehicle with no declared capacity as eligible', async () => {
-      drivers.findNearby.mockResolvedValue([
-        candidate('driver-1', [{ capacityKg: null }]),
-      ]);
+      drivers.findNearby.mockResolvedValue([candidate('driver-1', [{ capacityKg: null }])]);
 
       const result = await service.assignDriver('delivery-1');
 
@@ -207,9 +205,9 @@ describe('AssignmentService', () => {
         candidate('driver-2', [{ capacityKg: 2 }]),
       ]);
 
-      await expect(
-        service.assignDriver('delivery-1'),
-      ).rejects.toBeInstanceOf(NoAvailableDriverError);
+      await expect(service.assignDriver('delivery-1')).rejects.toBeInstanceOf(
+        NoAvailableDriverError,
+      );
     });
   });
 
@@ -217,9 +215,9 @@ describe('AssignmentService', () => {
     it('throws NoAvailableDriverError when no driver is nearby at all', async () => {
       drivers.findNearby.mockResolvedValue([]);
 
-      await expect(
-        service.assignDriver('delivery-1'),
-      ).rejects.toBeInstanceOf(NoAvailableDriverError);
+      await expect(service.assignDriver('delivery-1')).rejects.toBeInstanceOf(
+        NoAvailableDriverError,
+      );
     });
 
     it('returns "skipped" if the delivery no longer exists', async () => {
@@ -250,13 +248,9 @@ describe('AssignmentService', () => {
     });
 
     it('propagates a Redis/nearby-query failure so a retrying caller can retry it', async () => {
-      drivers.findNearby.mockRejectedValue(
-        new Error('Unable to search for nearby drivers'),
-      );
+      drivers.findNearby.mockRejectedValue(new Error('Unable to search for nearby drivers'));
 
-      await expect(
-        service.assignDriver('delivery-1'),
-      ).rejects.toThrow(/Unable to search/);
+      await expect(service.assignDriver('delivery-1')).rejects.toThrow(/Unable to search/);
     });
   });
 

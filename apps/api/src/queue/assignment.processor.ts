@@ -21,22 +21,15 @@ export class AssignmentProcessor extends WorkerHost {
     const result = await this.assignmentService.assignDriver(deliveryId);
 
     if (result.outcome === 'skipped') {
-      this.logger.log(
-        `Assignment skipped for delivery ${deliveryId}: ${result.reason}`,
-      );
+      this.logger.log(`Assignment skipped for delivery ${deliveryId}: ${result.reason}`);
       return;
     }
 
-    this.logger.log(
-      `Assigned driver ${result.driverId} to delivery ${result.deliveryId}`,
-    );
+    this.logger.log(`Assigned driver ${result.driverId} to delivery ${result.deliveryId}`);
   }
 
   @OnWorkerEvent('failed')
-  async onFailed(
-    job: Job<AssignmentJobData> | undefined,
-    error: Error,
-  ): Promise<void> {
+  async onFailed(job: Job<AssignmentJobData> | undefined, error: Error): Promise<void> {
     if (!job) return;
 
     const attemptsMade = job.attemptsMade;
@@ -48,10 +41,7 @@ export class AssignmentProcessor extends WorkerHost {
     );
 
     if (attemptsMade >= maxAttempts) {
-      await this.assignmentService.markFailed(
-        job.data.deliveryId,
-        error.message,
-      );
+      await this.assignmentService.markFailed(job.data.deliveryId, error.message);
     }
   }
 }

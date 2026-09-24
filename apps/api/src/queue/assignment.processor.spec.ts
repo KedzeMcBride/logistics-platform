@@ -17,9 +17,7 @@ describe('AssignmentProcessor', () => {
       markFailed: jest.fn(),
     };
 
-    processor = new AssignmentProcessor(
-      assignmentService as unknown as AssignmentService,
-    );
+    processor = new AssignmentProcessor(assignmentService as unknown as AssignmentService);
   });
 
   function makeJob(
@@ -64,9 +62,7 @@ describe('AssignmentProcessor', () => {
         new Error('No available drivers within 5km of pickup'),
       );
 
-      await expect(processor.process(makeJob())).rejects.toThrow(
-        /No available drivers/,
-      );
+      await expect(processor.process(makeJob())).rejects.toThrow(/No available drivers/);
 
       expect(assignmentService.assignDriver).toHaveBeenCalledWith('delivery-1');
     });
@@ -94,10 +90,7 @@ describe('AssignmentProcessor', () => {
         new Error('no drivers'),
       );
 
-      expect(assignmentService.markFailed).toHaveBeenCalledWith(
-        'delivery-1',
-        'no drivers',
-      );
+      expect(assignmentService.markFailed).toHaveBeenCalledWith('delivery-1', 'no drivers');
 
       expect(assignmentService.markFailed).toHaveBeenCalledTimes(1);
     });
@@ -111,10 +104,7 @@ describe('AssignmentProcessor', () => {
         new Error('assignment failed'),
       );
 
-      expect(assignmentService.markFailed).toHaveBeenCalledWith(
-        'delivery-1',
-        'assignment failed',
-      );
+      expect(assignmentService.markFailed).toHaveBeenCalledWith('delivery-1', 'assignment failed');
     });
 
     it('does not clobber the delivery while retries remain', async () => {
@@ -130,9 +120,7 @@ describe('AssignmentProcessor', () => {
     });
 
     it('ignores a failed event with no job', async () => {
-      await expect(
-        processor.onFailed(undefined, new Error('x')),
-      ).resolves.toBeUndefined();
+      await expect(processor.onFailed(undefined, new Error('x'))).resolves.toBeUndefined();
 
       expect(assignmentService.markFailed).not.toHaveBeenCalled();
     });

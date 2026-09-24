@@ -1,15 +1,10 @@
-
 /**
  * Day 16 — Accept / Reject / Timeout test suite.
  *
  * Tests the current AssignmentService implementation using mocked
  * PrismaService, AssignmentQueueService, and DriversService.
  */
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { AssignmentService } from './assignment.service';
@@ -124,10 +119,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverRespondedAt: expect.any(Date),
       });
 
-      const result = await service.acceptAssignment(
-        'delivery-1',
-        'driver-1',
-      );
+      const result = await service.acceptAssignment('delivery-1', 'driver-1');
 
       expect(result.status).toBe('DRIVER_ACCEPTED');
 
@@ -152,9 +144,9 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
     it('throws NotFoundException for a missing delivery', async () => {
       prisma.delivery.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.acceptAssignment('missing', 'driver-1'),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.acceptAssignment('missing', 'driver-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
 
     it('throws ForbiddenException when the responding driver is not the assigned one', async () => {
@@ -163,9 +155,9 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverId: 'other-driver',
       });
 
-      await expect(
-        service.acceptAssignment('delivery-1', 'driver-1'),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.acceptAssignment('delivery-1', 'driver-1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('throws BadRequestException when status is not DRIVER_ASSIGNED', async () => {
@@ -174,9 +166,9 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         status: 'DRIVER_ACCEPTED',
       });
 
-      await expect(
-        service.acceptAssignment('delivery-1', 'driver-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.acceptAssignment('delivery-1', 'driver-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when the response deadline has already passed', async () => {
@@ -185,9 +177,9 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverResponseDeadline: new Date(Date.now() - 5_000),
       });
 
-      await expect(
-        service.acceptAssignment('delivery-1', 'driver-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.acceptAssignment('delivery-1', 'driver-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 
@@ -218,11 +210,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverRespondedAt: null,
       });
 
-      const result = await service.rejectAssignment(
-        'delivery-1',
-        'driver-1',
-        'too far',
-      );
+      const result = await service.rejectAssignment('delivery-1', 'driver-1', 'too far');
 
       expect(result).toEqual({
         deliveryId: 'delivery-1',
@@ -273,10 +261,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverRespondedAt: null,
       });
 
-      const result = await service.rejectAssignment(
-        'delivery-1',
-        'driver-1',
-      );
+      const result = await service.rejectAssignment('delivery-1', 'driver-1');
 
       expect(result).toEqual({
         deliveryId: 'delivery-1',
@@ -292,9 +277,9 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverId: 'someone-else',
       });
 
-      await expect(
-        service.rejectAssignment('delivery-1', 'driver-1'),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.rejectAssignment('delivery-1', 'driver-1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('throws BadRequestException when the delivery is not in DRIVER_ASSIGNED', async () => {
@@ -303,9 +288,9 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         status: 'DRIVER_ACCEPTED',
       });
 
-      await expect(
-        service.rejectAssignment('delivery-1', 'driver-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.rejectAssignment('delivery-1', 'driver-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 
@@ -336,11 +321,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverRespondedAt: null,
       });
 
-      await service.handleTimeout(
-        'delivery-1',
-        'driver-1',
-        1,
-      );
+      await service.handleTimeout('delivery-1', 'driver-1', 1);
 
       expect(prisma.deliveryStatusHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -349,8 +330,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
             fromStatus: 'DRIVER_ASSIGNED',
             toStatus: 'SEARCHING_FOR_DRIVER',
             changedBy: 'driver-1',
-            reason:
-              'Driver driver-1 timed out responding to assignment attempt 1',
+            reason: 'Driver driver-1 timed out responding to assignment attempt 1',
           }),
         }),
       );
@@ -376,11 +356,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         driverRespondedAt: new Date(),
       });
 
-      await service.handleTimeout(
-        'delivery-1',
-        'driver-1',
-        1,
-      );
+      await service.handleTimeout('delivery-1', 'driver-1', 1);
 
       expect(prisma.delivery.update).not.toHaveBeenCalled();
       expect(queue.enqueueAssignment).not.toHaveBeenCalled();
@@ -392,11 +368,7 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
         status: 'DRIVER_ACCEPTED',
       });
 
-      await service.handleTimeout(
-        'delivery-1',
-        'driver-1',
-        1,
-      );
+      await service.handleTimeout('delivery-1', 'driver-1', 1);
 
       expect(prisma.delivery.update).not.toHaveBeenCalled();
       expect(queue.enqueueAssignment).not.toHaveBeenCalled();
@@ -405,17 +377,10 @@ describe('AssignmentService — accept/reject/timeout (Day 16)', () => {
     it('is a no-op if the delivery no longer exists', async () => {
       prisma.delivery.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.handleTimeout(
-          'delivery-1',
-          'driver-1',
-          1,
-        ),
-      ).resolves.toBeUndefined();
+      await expect(service.handleTimeout('delivery-1', 'driver-1', 1)).resolves.toBeUndefined();
 
       expect(prisma.delivery.update).not.toHaveBeenCalled();
       expect(queue.enqueueAssignment).not.toHaveBeenCalled();
     });
   });
 });
-

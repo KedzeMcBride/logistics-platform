@@ -22,11 +22,11 @@ describe('AssignmentQueueService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-    providers: [
-      AssignmentQueueService,
-      { provide: getQueueToken(ASSIGNMENT_QUEUE_NAME), useValue: mockQueue },
-      { provide: getQueueToken(ASSIGNMENT_TIMEOUT_QUEUE_NAME), useValue: mockQueue },
-    ],
+      providers: [
+        AssignmentQueueService,
+        { provide: getQueueToken(ASSIGNMENT_QUEUE_NAME), useValue: mockQueue },
+        { provide: getQueueToken(ASSIGNMENT_TIMEOUT_QUEUE_NAME), useValue: mockQueue },
+      ],
     }).compile();
 
     service = module.get(AssignmentQueueService);

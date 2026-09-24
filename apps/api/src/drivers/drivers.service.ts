@@ -208,7 +208,6 @@ export class DriversService {
    * the results; it isn't an error.
    */
 
-  
   async findNearby(query: NearbyDriversQueryDto) {
     const radiusKm = query.radiusKm ?? 5;
     const limit = query.limit ?? 20;
@@ -286,7 +285,6 @@ export class DriversService {
         };
       });
   }
-
 
   private parseGeosearchResults(raw: unknown): NearbyMatch[] {
     if (!Array.isArray(raw)) return [];

@@ -426,9 +426,7 @@ export class AssignmentService {
         data: {
           driverId,
           status: 'DRIVER_ASSIGNED',
-          driverResponseDeadline: new Date(
-            Date.now() + ASSIGNMENT_RESPONSE_TIMEOUT_MS,
-          ),
+          driverResponseDeadline: new Date(Date.now() + ASSIGNMENT_RESPONSE_TIMEOUT_MS),
           driverRespondedAt: null,
         },
       });
