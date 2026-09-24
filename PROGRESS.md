@@ -1738,3 +1738,148 @@ The previously documented Prisma-engine network restriction is not blocking Day 
 Proceed to the next roadmap day using the existing AssignmentService and AssignmentProcessor foundation. More advanced driver matching rules should be added incrementally without replacing the existing assignment architecture.
 
 '@ | Add-Content -Path PROGRESS.md -Encoding UTF8
+
+# Day 16 — Roadmap Day 23: Accept / Reject / Timeout
+
+**Target date:** Saturday, 26 September 2026
+**Status:** DRAFT — NOT YET VERIFIED (see Blockers)
+
+## Overview
+
+Day 16 targeted the "Accept / Reject / Timeout" roadmap goal: give a driver a
+real response step after being matched (Day 15's `AssignmentService`), with
+rejection handling and an assignment-response timeout.
+
+**Environment note — read before treating this as a normal daily entry:**
+This day's code was authored in a network-isolated agent sandbox that could
+not clone or browse the live repository (`apps/api/src/**` and
+`packages/database/prisma/schema.prisma` were not readable; GitHub's
+directory/raw endpoints returned robots-disallowed to the fetch tool, and the
+sandbox's shell has no network access at all). The implementation below was
+therefore written against the documented architecture in this file's Day
+13–15 entries, not against the live source. **No test, typecheck, build, or
+API/browser verification has been run.** Nothing in this entry should be
+treated as COMPLETE until a developer with real repo access has reconciled
+the assumptions below, run the commands in "Required Verification," and
+updated this section with real results.
+
+## Inspection performed (Day 13–15 entries in this file)
+
+- Confirmed accept/reject/timeout did not exist anywhere through Day 15 —
+  the Day 15 `AssignmentService` selects a driver and assigns them directly;
+  nothing in the documented flow waits for driver confirmation.
+- Confirmed `Delivery.assignmentAttempts` and the retry-exhaustion → `FAILED`
+  path already exist (Day 14) and were reused rather than duplicated: reject
+  and timeout both feed the same attempt counter and the same exhaustion
+  behavior as a queue-job failure.
+- Confirmed the repo's established conventions for: Redis/queue failures
+  being logged rather than thrown (`syncGeoIndex`, `enqueueAssignment`);
+  deterministic dash-separated BullMQ job IDs (`assign-driver-<id>`, extended
+  here to `check-assignment-response-<id>-<attempt>`); and ownership checks
+  via direct field comparison / `findFirst({ id, userId })`.
+
+## Scope completed (pending reconciliation — see Blockers)
+
+- Two new `Delivery` fields: `driverResponseDeadline`, `driverRespondedAt`,
+  plus `excludedDriverIds` to prevent re-offering to a driver who already
+  rejected or timed out on this delivery.
+- One new `DeliveryStatus` value: `DRIVER_ACCEPTED`. `DRIVER_ASSIGNED` keeps
+  its existing meaning; reject/timeout route back through the existing
+  `SEARCHING_FOR_DRIVER` state rather than a new one.
+- New BullMQ queue `driver-assignment-timeout` + `AssignmentTimeoutProcessor`
+  worker: schedules a delayed check when a delivery reaches `DRIVER_ASSIGNED`,
+  cancelled on accept/reject, and treats an unresponded expired deadline as
+  equivalent to a rejection.
+- `AssignmentService.acceptAssignment` / `.rejectAssignment` / `.handleTimeout`,
+  sharing one `handleDriverUnavailable` path for reject+timeout.
+- Two new driver-only routes: `PATCH /deliveries/:id/accept`,
+  `PATCH /deliveries/:id/reject` (`JwtAuthGuard` + `RolesGuard(DRIVER)`,
+  matching existing route conventions).
+- Test suites: `assignment-response.service.spec.ts` (11 cases — accept
+  happy path + 4 failure paths; reject happy path + exhaustion + 2 failure
+  paths; timeout happy path + 3 no-op guards) and
+  `assignment-timeout.processor.spec.ts` (6 cases covering the no-op guards:
+  missing delivery, already-responded, status changed, superseded driver,
+  deadline-not-actually-passed).
+
+## Files changed
+
+- `packages/database/prisma/schema.prisma` — 3 new `Delivery` fields, 1 new
+  enum value (see `apps/api/prisma_diff/schema.prisma.diff.md` for the exact
+  diff and a join-table alternative)
+- `apps/api/src/queue/constants.ts` — new queue/job name constants, timeout
+  duration, jobId builder
+- `apps/api/src/queue/assignment-queue.service.ts` — new
+  `scheduleResponseTimeout` / `cancelResponseTimeout` methods, second
+  injected `Queue`
+- `apps/api/src/queue/assignment-timeout.processor.ts` — new worker
+- `apps/api/src/queue/assignment-timeout.processor.spec.ts` — new
+- `apps/api/src/queue/queue.module.ts` — registers the second queue + worker
+- `apps/api/src/assignment/assignment.service.ts` — new
+  `acceptAssignment` / `rejectAssignment` / `handleTimeout` methods
+- `apps/api/src/assignment/assignment-response.service.spec.ts` — new
+- `apps/api/src/assignment/assignment.processor.ts` (or wherever the Day 14
+  `AssignmentProcessor` lives) — the `DRIVER_ASSIGNED` transition now also
+  sets `driverResponseDeadline` and schedules the timeout job
+- `apps/api/src/deliveries/dto/reject-assignment.dto.ts` — new
+- `apps/api/src/deliveries/deliveries.controller.ts` — two new routes
+
+No frontend changes were made — today's scope, per the daily brief, is
+backend state/authorization/timeout logic. A driver-facing accept/reject UI
+is a reasonable next step but was not requested for Day 16.
+
+## Required verification (NOT YET RUN)
+
+```bash
+pnpm --filter @repo/database prisma migrate dev --name driver_response_tracking
+pnpm --filter @repo/api typecheck
+pnpm --filter @repo/api lint
+pnpm --filter @repo/api test
+pnpm --filter @repo/api build
+```
+
+API check (manual, once the above passes):
+
+1. Seed/confirm a delivery so it reaches `DRIVER_ASSIGNED` with an ONLINE
+   driver nearby (reuse the Day 14 flow: `POST /deliveries` →
+   `PATCH /deliveries/:id/confirm`).
+2. `PATCH /deliveries/:id/reject` as a different driver → expect 403.
+3. `PATCH /deliveries/:id/reject` as the assigned driver → expect the
+   delivery to move to `SEARCHING_FOR_DRIVER`, `excludedDriverIds` to
+   contain that driver, and (with a second ONLINE driver seeded nearby) a
+   new `DRIVER_ASSIGNED` to follow shortly via the reused queue.
+4. Let a `DRIVER_ASSIGNED` delivery sit past `ASSIGNMENT_RESPONSE_TIMEOUT_MS`
+   with no response → expect the same reassignment behavior as a rejection,
+   with history reason `TIMEOUT`.
+5. `PATCH /deliveries/:id/accept` as the assigned driver before the deadline
+   → expect `DRIVER_ACCEPTED` and no further timeout job firing.
+6. Repeatedly reject with only one driver in range until `assignmentAttempts`
+   reaches the existing max → expect `FAILED`, matching Day 14's exhaustion
+   behavior exactly.
+
+## Blockers
+
+**BLOCKED (environment): full implementation authored without live repo
+access.** The agent sandbox used to write this code could not read
+`apps/api/src/**` or the Prisma schema (GitHub blocked directory/raw
+browsing; no shell network access). The code above was written to match the
+documented Day 13–15 architecture and flagged every assumed field/method
+name inline (`driverId` on `Delivery`, `reason` on `DeliveryStatusHistory`,
+`this.queue` inside `AssignmentQueueService`, role-guard decorator shape).
+**Do not create a Git checkpoint for Day 16 until:**
+1. Each assumption above has been checked against the real files and
+   corrected where wrong.
+2. `prisma migrate dev`, `typecheck`, `lint`, `test`, and `build` all pass.
+3. The manual API verification steps above have been run against a real
+   dev environment and their actual results recorded here, replacing this
+   draft's placeholders.
+
+## Next Development Step
+
+Once verified: build the driver-facing accept/reject UI (a natural Day 17
+candidate) on top of these two routes rather than re-deriving the state
+machine — `DRIVER_ASSIGNED` / `DRIVER_ACCEPTED` / the reuse of
+`SEARCHING_FOR_DRIVER` for reject-and-timeout is the intended shape going
+forward. Do not re-implement the response-timeout mechanism; extend
+`AssignmentTimeoutProcessor` if a per-driver or per-priority timeout
+duration is later needed.

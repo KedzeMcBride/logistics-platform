@@ -1,5 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsLatitude, IsLongitude, IsNumber, IsOptional, Max, Min } from 'class-validator';
+
+import {
+  IsArray,
+  IsInt,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class NearbyDriversQueryDto {
   @Type(() => Number)
@@ -26,4 +37,10 @@ export class NearbyDriversQueryDto {
   @Min(1)
   @Max(50)
   limit?: number = 20;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  excludeDriverIds?: string[];
 }
+

@@ -1,5 +1,6 @@
 import type { DriversService } from '../drivers';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { AssignmentQueueService } from '../queue/assignment-queue.service';
 
 import { AssignmentService } from './assignment.service';
 import { NoAvailableDriverError } from './no-available-driver.error';
@@ -16,6 +17,10 @@ describe('AssignmentService', () => {
     $transaction: jest.Mock;
   };
   let drivers: { findNearby: jest.Mock };
+  let assignmentQueue: {
+    scheduleResponseTimeout: jest.Mock;
+    cancelResponseTimeout: jest.Mock;
+  };
   let lastTx: MockTx | undefined;
 
   const baseDelivery = {
@@ -24,17 +29,25 @@ describe('AssignmentService', () => {
     pickupLat: 4.05,
     pickupLng: 9.7,
     packageWeightKg: 10,
+    assignmentAttempts: 1,
   };
 
   function candidate(
     driverId: string,
     vehicles: { capacityKg: number | null }[] = [{ capacityKg: null }],
   ) {
-    return { driverId, distanceKm: 1, lat: 4.05, lng: 9.7, vehicles };
+    return {
+      driverId,
+      distanceKm: 1,
+      lat: 4.05,
+      lng: 9.7,
+      vehicles,
+    };
   }
 
   beforeEach(() => {
     lastTx = undefined;
+
     prisma = {
       delivery: {
         findUnique: jest.fn().mockResolvedValue(baseDelivery),
@@ -45,16 +58,28 @@ describe('AssignmentService', () => {
           delivery: { update: jest.fn() },
           deliveryStatusHistory: { create: jest.fn() },
         };
+
         lastTx = tx;
+
         await fn(tx);
+
         return tx;
       }),
     };
-    drivers = { findNearby: jest.fn() };
+
+    drivers = {
+      findNearby: jest.fn(),
+    };
+
+    assignmentQueue = {
+      scheduleResponseTimeout: jest.fn().mockResolvedValue(undefined),
+      cancelResponseTimeout: jest.fn().mockResolvedValue(undefined),
+    };
 
     service = new AssignmentService(
       prisma as unknown as PrismaService,
       drivers as unknown as DriversService,
+      assignmentQueue as unknown as AssignmentQueueService,
     );
   });
 
@@ -78,19 +103,28 @@ describe('AssignmentService', () => {
         lng: baseDelivery.pickupLng,
         radiusKm: expect.any(Number),
         limit: expect.any(Number),
+        excludeDriverIds: [],
       });
 
       // Two transactions: CONFIRMED -> SEARCHING_FOR_DRIVER, then the
       // assignment itself.
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+
       expect(prisma.delivery.update).toHaveBeenCalledWith({
         where: { id: 'delivery-1' },
         data: { assignmentAttempts: { increment: 1 } },
       });
+
       expect(lastTx!.delivery.update).toHaveBeenCalledWith({
         where: { id: 'delivery-1' },
-        data: { driverId: 'driver-1', status: 'DRIVER_ASSIGNED' },
+        data: {
+          driverId: 'driver-1',
+          status: 'DRIVER_ASSIGNED',
+          driverResponseDeadline: expect.any(Date),
+          driverRespondedAt: null,
+        },
       });
+
       expect(lastTx!.deliveryStatusHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -100,6 +134,12 @@ describe('AssignmentService', () => {
           }),
         }),
       );
+
+      expect(assignmentQueue.scheduleResponseTimeout).toHaveBeenCalledWith(
+        'delivery-1',
+        'driver-1',
+        expect.any(Number),
+      );
     });
 
     it('does not re-transition CONFIRMED->SEARCHING when already SEARCHING_FOR_DRIVER (a retry)', async () => {
@@ -107,6 +147,7 @@ describe('AssignmentService', () => {
         ...baseDelivery,
         status: 'SEARCHING_FOR_DRIVER',
       });
+
       drivers.findNearby.mockResolvedValue([candidate('driver-1')]);
 
       await service.assignDriver('delivery-1');
@@ -133,7 +174,9 @@ describe('AssignmentService', () => {
     });
 
     it('treats a vehicle with no declared capacity as eligible', async () => {
-      drivers.findNearby.mockResolvedValue([candidate('driver-1', [{ capacityKg: null }])]);
+      drivers.findNearby.mockResolvedValue([
+        candidate('driver-1', [{ capacityKg: null }]),
+      ]);
 
       const result = await service.assignDriver('delivery-1');
 
@@ -164,9 +207,9 @@ describe('AssignmentService', () => {
         candidate('driver-2', [{ capacityKg: 2 }]),
       ]);
 
-      await expect(service.assignDriver('delivery-1')).rejects.toBeInstanceOf(
-        NoAvailableDriverError,
-      );
+      await expect(
+        service.assignDriver('delivery-1'),
+      ).rejects.toBeInstanceOf(NoAvailableDriverError);
     });
   });
 
@@ -174,9 +217,9 @@ describe('AssignmentService', () => {
     it('throws NoAvailableDriverError when no driver is nearby at all', async () => {
       drivers.findNearby.mockResolvedValue([]);
 
-      await expect(service.assignDriver('delivery-1')).rejects.toBeInstanceOf(
-        NoAvailableDriverError,
-      );
+      await expect(
+        service.assignDriver('delivery-1'),
+      ).rejects.toBeInstanceOf(NoAvailableDriverError);
     });
 
     it('returns "skipped" if the delivery no longer exists', async () => {
@@ -189,11 +232,15 @@ describe('AssignmentService', () => {
         deliveryId: 'delivery-1',
         reason: expect.stringContaining('no longer exists'),
       });
+
       expect(drivers.findNearby).not.toHaveBeenCalled();
     });
 
     it('returns "skipped" if the delivery already moved past the assignable window (e.g. cancelled)', async () => {
-      prisma.delivery.findUnique.mockResolvedValue({ ...baseDelivery, status: 'CANCELLED' });
+      prisma.delivery.findUnique.mockResolvedValue({
+        ...baseDelivery,
+        status: 'CANCELLED',
+      });
 
       const result = await service.assignDriver('delivery-1');
 
@@ -203,9 +250,13 @@ describe('AssignmentService', () => {
     });
 
     it('propagates a Redis/nearby-query failure so a retrying caller can retry it', async () => {
-      drivers.findNearby.mockRejectedValue(new Error('Unable to search for nearby drivers'));
+      drivers.findNearby.mockRejectedValue(
+        new Error('Unable to search for nearby drivers'),
+      );
 
-      await expect(service.assignDriver('delivery-1')).rejects.toThrow(/Unable to search/);
+      await expect(
+        service.assignDriver('delivery-1'),
+      ).rejects.toThrow(/Unable to search/);
     });
   });
 
@@ -219,14 +270,20 @@ describe('AssignmentService', () => {
       await service.markFailed('delivery-1', 'no drivers');
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
       expect(lastTx!.delivery.update).toHaveBeenCalledWith({
         where: { id: 'delivery-1' },
-        data: { status: 'FAILED' },
+        data: {
+          status: 'FAILED',
+        },
       });
     });
 
     it('does not clobber a delivery that already moved on (e.g. cancelled) before failure was handled', async () => {
-      prisma.delivery.findUnique.mockResolvedValue({ ...baseDelivery, status: 'CANCELLED' });
+      prisma.delivery.findUnique.mockResolvedValue({
+        ...baseDelivery,
+        status: 'CANCELLED',
+      });
 
       await service.markFailed('delivery-1', 'no drivers');
 

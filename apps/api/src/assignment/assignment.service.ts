@@ -8,6 +8,7 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { DriversService } from '../drivers/drivers.service';
+import { AssignmentQueueService } from '../queue/assignment-queue.service';
 import { ASSIGNMENT_RESPONSE_TIMEOUT_MS } from '../queue/constants';
 
 import {
@@ -45,6 +46,7 @@ export class AssignmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly drivers: DriversService,
+    private readonly assignmentQueue: AssignmentQueueService,
   ) {}
 
   async assignDriver(deliveryId: string): Promise<AssignmentResult> {
@@ -77,11 +79,14 @@ export class AssignmentService {
       data: { assignmentAttempts: { increment: 1 } },
     });
 
+    const excludedDriverIds = this.getExcludedDriverIds(delivery.excludedDriverIds);
+
     const candidates = await this.drivers.findNearby({
       lat: delivery.pickupLat,
       lng: delivery.pickupLng,
       radiusKm: ASSIGNMENT_SEARCH_RADIUS_KM,
       limit: ASSIGNMENT_CANDIDATE_LIMIT,
+      excludeDriverIds: excludedDriverIds,
     });
 
     const chosen = this.selectDriver(candidates, delivery.packageWeightKg);
@@ -131,6 +136,9 @@ export class AssignmentService {
       return;
     }
 
+    // Do not offer the same driver again after a timeout.
+    await this.excludeDriver(deliveryId, driverId);
+
     await this.returnToSearching(
       deliveryId,
       driverId,
@@ -160,12 +168,15 @@ export class AssignmentService {
     if (!delivery) {
       throw new NotFoundException('Delivery not found');
     }
+
     if (delivery.driverId !== driverId) {
       throw new ForbiddenException('This delivery is not assigned to you');
     }
+
     if (delivery.status !== 'DRIVER_ASSIGNED') {
       throw new BadRequestException(`Cannot accept a delivery in status ${delivery.status}`);
     }
+
     if (delivery.driverResponseDeadline && delivery.driverResponseDeadline < new Date()) {
       throw new BadRequestException('The response window for this delivery has expired');
     }
@@ -173,7 +184,10 @@ export class AssignmentService {
     const [updated] = await this.prisma.$transaction([
       this.prisma.delivery.update({
         where: { id: deliveryId },
-        data: { status: 'DRIVER_ACCEPTED', driverRespondedAt: new Date() },
+        data: {
+          status: 'DRIVER_ACCEPTED',
+          driverRespondedAt: new Date(),
+        },
       }),
       this.prisma.deliveryStatusHistory.create({
         data: {
@@ -209,12 +223,17 @@ export class AssignmentService {
     if (!delivery) {
       throw new NotFoundException('Delivery not found');
     }
+
     if (delivery.driverId !== driverId) {
       throw new ForbiddenException('This delivery is not assigned to you');
     }
+
     if (delivery.status !== 'DRIVER_ASSIGNED') {
       throw new BadRequestException(`Cannot reject a delivery in status ${delivery.status}`);
     }
+
+    // Do not offer the same driver again after a rejection.
+    await this.excludeDriver(deliveryId, driverId);
 
     await this.returnToSearching(
       deliveryId,
@@ -262,11 +281,35 @@ export class AssignmentService {
   }
 
   /**
+   * Adds a driver to the delivery's exclusion list so that the same driver
+   * is not selected again after rejecting or timing out.
+   */
+  private async excludeDriver(deliveryId: string, driverId: string): Promise<void> {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      select: { excludedDriverIds: true },
+    });
+
+    if (!delivery) return;
+
+    const excludedDriverIds = this.getExcludedDriverIds(delivery.excludedDriverIds);
+
+    if (excludedDriverIds.includes(driverId)) return;
+
+    await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        excludedDriverIds: {
+          push: driverId,
+        },
+      },
+    });
+  }
+
+  /**
    * Shared by handleTimeout and rejectAssignment: try to find another
    * driver immediately; give up to FAILED via the existing markFailed path
-   * if none are available. Identical to the retry behavior handleTimeout
-   * already had before accept/reject existed — just factored out so reject
-   * doesn't duplicate it.
+   * if none are available.
    */
   private async reassignOrFail(deliveryId: string): Promise<void> {
     try {
@@ -276,6 +319,7 @@ export class AssignmentService {
         await this.markFailed(deliveryId, error.message);
         return;
       }
+
       throw error;
     }
   }
@@ -333,6 +377,18 @@ export class AssignmentService {
     );
   }
 
+  /**
+   * Safely converts the Prisma JSON exclusion list into a string array.
+   *
+   * The JSON column should contain an array of driver IDs, but this guard
+   * prevents malformed/null JSON values from breaking assignment.
+   */
+  private getExcludedDriverIds(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+
+    return value.filter((id): id is string => typeof id === 'string');
+  }
+
   private async markSearching(deliveryId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await tx.delivery.update({
@@ -353,17 +409,26 @@ export class AssignmentService {
   }
 
   private async assign(deliveryId: string, driverId: string): Promise<void> {
-    // NOTE: driverResponseDeadline is set here as the Day 16 fix — VERIFY
-    // this isn't ALSO being set in assignment.processor.ts right after
-    // calling assignDriver(), or a delivery could get a deadline computed
-    // twice (harmless) or, worse, overwritten with a different clock read.
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      select: {
+        assignmentAttempts: true,
+      },
+    });
+
+    if (!delivery) {
+      return;
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.delivery.update({
         where: { id: deliveryId },
         data: {
           driverId,
           status: 'DRIVER_ASSIGNED',
-          driverResponseDeadline: new Date(Date.now() + ASSIGNMENT_RESPONSE_TIMEOUT_MS),
+          driverResponseDeadline: new Date(
+            Date.now() + ASSIGNMENT_RESPONSE_TIMEOUT_MS,
+          ),
           driverRespondedAt: null,
         },
       });
@@ -378,5 +443,11 @@ export class AssignmentService {
         },
       });
     });
+
+    await this.assignmentQueue.scheduleResponseTimeout(
+      deliveryId,
+      driverId,
+      delivery.assignmentAttempts,
+    );
   }
 }

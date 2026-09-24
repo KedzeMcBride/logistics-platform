@@ -262,6 +262,7 @@ model Delivery {
   finalPrice           Decimal? @db.Decimal(10, 2)
 
   assignmentAttempts      Int      @default(0)
+  excludedDriverIds Json @default("[]")
   driverResponseDeadline  DateTime?
   driverRespondedAt       DateTime?
 

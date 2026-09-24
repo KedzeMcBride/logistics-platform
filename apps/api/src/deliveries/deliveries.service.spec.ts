@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { AssignmentService } from '../assignment';
+import { DriversService } from '../drivers';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignmentQueueService } from '../queue';
 
@@ -17,6 +19,15 @@ describe('DeliveriesService (integration)', () => {
 
   const mockAssignmentQueue = {
     enqueueAssignment: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockAssignmentService = {
+    acceptAssignment: jest.fn(),
+    rejectAssignment: jest.fn(),
+  };
+
+  const mockDriversService = {
+    getMe: jest.fn(),
   };
 
   const CREATE_INPUT = {
@@ -42,6 +53,8 @@ describe('DeliveriesService (integration)', () => {
         PricingService,
         PrismaService,
         { provide: AssignmentQueueService, useValue: mockAssignmentQueue },
+        { provide: AssignmentService, useValue: mockAssignmentService },
+        { provide: DriversService, useValue: mockDriversService },
       ],
     }).compile();
 
@@ -90,6 +103,7 @@ describe('DeliveriesService (integration)', () => {
     it('confirms a PENDING delivery', async () => {
       const created = await service.create(customerUserId, CREATE_INPUT);
       const confirmed = await service.confirm(customerUserId, created.id);
+
       expect(confirmed.status).toBe('CONFIRMED');
       expect(confirmed.confirmedAt).toBeInstanceOf(Date);
       expect(confirmed.statusHistory).toHaveLength(2);
@@ -119,6 +133,7 @@ describe('DeliveriesService (integration)', () => {
     it('rejects confirming a non-PENDING delivery', async () => {
       const created = await service.create(customerUserId, CREATE_INPUT);
       await service.confirm(customerUserId, created.id);
+
       await expect(service.confirm(customerUserId, created.id)).rejects.toBeInstanceOf(
         BadRequestException,
       );
@@ -127,6 +142,7 @@ describe('DeliveriesService (integration)', () => {
     it('cancels a PENDING delivery', async () => {
       const created = await service.create(customerUserId, CREATE_INPUT);
       const cancelled = await service.cancel(customerUserId, created.id, { reason: 'test' });
+
       expect(cancelled.status).toBe('CANCELLED');
       expect(cancelled.cancelledReason).toBe('test');
       expect(cancelled.cancelledAt).toBeInstanceOf(Date);
@@ -134,10 +150,12 @@ describe('DeliveriesService (integration)', () => {
 
     it('rejects cancel on DELIVERED', async () => {
       const created = await service.create(customerUserId, CREATE_INPUT);
+
       await prisma.delivery.update({
         where: { id: created.id },
         data: { status: 'DELIVERED' },
       });
+
       await expect(
         service.cancel(customerUserId, created.id, { reason: 'test' }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -147,6 +165,7 @@ describe('DeliveriesService (integration)', () => {
   describe('access control', () => {
     it('rejects detail access from a different customer', async () => {
       const created = await service.create(customerUserId, CREATE_INPUT);
+
       await expect(
         service.detail('00000000-0000-0000-0000-000000000000', 'CUSTOMER', created.id),
       ).rejects.toBeInstanceOf(ForbiddenException);
@@ -154,12 +173,17 @@ describe('DeliveriesService (integration)', () => {
 
     it('returns 404 for a missing delivery', async () => {
       await expect(
-        service.detail(customerUserId, 'CUSTOMER', '00000000-0000-0000-0000-000000000000'),
+        service.detail(
+          customerUserId,
+          'CUSTOMER',
+          '00000000-0000-0000-0000-000000000000',
+        ),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('rejects confirm from a different customer', async () => {
       const created = await service.create(customerUserId, CREATE_INPUT);
+
       await expect(
         service.confirm('00000000-0000-0000-0000-000000000000', created.id),
       ).rejects.toBeInstanceOf(ForbiddenException);

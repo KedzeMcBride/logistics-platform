@@ -2,7 +2,11 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { AssignmentQueueService } from './assignment-queue.service';
-import { ASSIGNMENT_JOB_NAME, ASSIGNMENT_QUEUE_NAME } from './constants';
+import {
+  ASSIGNMENT_JOB_NAME,
+  ASSIGNMENT_QUEUE_NAME,
+  ASSIGNMENT_TIMEOUT_QUEUE_NAME,
+} from './constants';
 
 describe('AssignmentQueueService', () => {
   let service: AssignmentQueueService;
@@ -18,10 +22,11 @@ describe('AssignmentQueueService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AssignmentQueueService,
-        { provide: getQueueToken(ASSIGNMENT_QUEUE_NAME), useValue: mockQueue },
-      ],
+    providers: [
+      AssignmentQueueService,
+      { provide: getQueueToken(ASSIGNMENT_QUEUE_NAME), useValue: mockQueue },
+      { provide: getQueueToken(ASSIGNMENT_TIMEOUT_QUEUE_NAME), useValue: mockQueue },
+    ],
     }).compile();
 
     service = module.get(AssignmentQueueService);

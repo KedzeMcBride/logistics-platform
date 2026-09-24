@@ -1,59 +1,30 @@
 import type { Job } from 'bullmq';
 
-import type { DriversService } from '../drivers';
-import type { PrismaService } from '../prisma/prisma.service';
+import type { AssignmentService } from '../assignment/assignment.service';
 
 import { AssignmentProcessor } from './assignment.processor';
 
-type MockTx = {
-  delivery: { update: jest.Mock };
-  deliveryStatusHistory: { create: jest.Mock };
-};
-
 describe('AssignmentProcessor', () => {
   let processor: AssignmentProcessor;
-  let prisma: {
-    delivery: { findUnique: jest.Mock; update: jest.Mock };
-    $transaction: jest.Mock;
-  };
-  let drivers: { findNearby: jest.Mock };
-  let lastTx: MockTx | undefined;
-
-  const baseDelivery = {
-    id: 'delivery-1',
-    status: 'CONFIRMED',
-    pickupLat: 4.05,
-    pickupLng: 9.7,
+  let assignmentService: {
+    assignDriver: jest.Mock;
+    markFailed: jest.Mock;
   };
 
   beforeEach(() => {
-    lastTx = undefined;
-    prisma = {
-      delivery: {
-        findUnique: jest.fn().mockResolvedValue(baseDelivery),
-        update: jest.fn().mockResolvedValue(undefined),
-      },
-      $transaction: jest.fn(async (fn: (tx: MockTx) => Promise<void>) => {
-        const tx: MockTx = {
-          delivery: { update: jest.fn() },
-          deliveryStatusHistory: { create: jest.fn() },
-        };
-        lastTx = tx;
-        await fn(tx);
-        return tx;
-      }),
+    assignmentService = {
+      assignDriver: jest.fn(),
+      markFailed: jest.fn(),
     };
-    drivers = { findNearby: jest.fn() };
 
     processor = new AssignmentProcessor(
-      prisma as unknown as PrismaService,
-      drivers as unknown as DriversService,
+      assignmentService as unknown as AssignmentService,
     );
   });
 
-  function makeJob(overrides: Partial<Job<{ deliveryId: string }>> = {}): Job<{
-    deliveryId: string;
-  }> {
+  function makeJob(
+    overrides: Partial<Job<{ deliveryId: string }>> = {},
+  ): Job<{ deliveryId: string }> {
     return {
       data: { deliveryId: 'delivery-1' },
       attemptsMade: 1,
@@ -62,131 +33,108 @@ describe('AssignmentProcessor', () => {
     } as Job<{ deliveryId: string }>;
   }
 
-  describe('process — happy path', () => {
-    it('assigns the nearest available driver and moves the delivery to DRIVER_ASSIGNED', async () => {
-      drivers.findNearby.mockResolvedValue([
-        { driverId: 'driver-1', distanceKm: 1.2 },
-        { driverId: 'driver-2', distanceKm: 3.4 },
-      ]);
+  describe('process', () => {
+    it('delegates assignment to AssignmentService and logs the assigned driver', async () => {
+      assignmentService.assignDriver.mockResolvedValue({
+        outcome: 'assigned',
+        deliveryId: 'delivery-1',
+        driverId: 'driver-1',
+      });
 
       await processor.process(makeJob());
 
-      expect(drivers.findNearby).toHaveBeenCalledWith({
-        lat: baseDelivery.pickupLat,
-        lng: baseDelivery.pickupLng,
-        radiusKm: expect.any(Number),
-        limit: expect.any(Number),
-      });
-
-      // Two transactions: CONFIRMED -> SEARCHING_FOR_DRIVER, then the
-      // assignment itself.
-      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
-      expect(prisma.delivery.update).toHaveBeenCalledWith({
-        where: { id: 'delivery-1' },
-        data: { assignmentAttempts: { increment: 1 } },
-      });
-
-      // Final transaction assigns the nearest (first) candidate.
-      expect(lastTx!.delivery.update).toHaveBeenCalledWith({
-        where: { id: 'delivery-1' },
-        data: { driverId: 'driver-1', status: 'DRIVER_ASSIGNED' },
-      });
-      expect(lastTx!.deliveryStatusHistory.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            deliveryId: 'delivery-1',
-            fromStatus: 'SEARCHING_FOR_DRIVER',
-            toStatus: 'DRIVER_ASSIGNED',
-          }),
-        }),
-      );
+      expect(assignmentService.assignDriver).toHaveBeenCalledWith('delivery-1');
+      expect(assignmentService.assignDriver).toHaveBeenCalledTimes(1);
     });
 
-    it('does not re-transition CONFIRMED->SEARCHING when already SEARCHING_FOR_DRIVER (a retry)', async () => {
-      prisma.delivery.findUnique.mockResolvedValue({
-        ...baseDelivery,
-        status: 'SEARCHING_FOR_DRIVER',
+    it('does not throw when AssignmentService skips the assignment', async () => {
+      assignmentService.assignDriver.mockResolvedValue({
+        outcome: 'skipped',
+        deliveryId: 'delivery-1',
+        reason: 'Delivery is CANCELLED, not assignable',
       });
-      drivers.findNearby.mockResolvedValue([{ driverId: 'driver-1', distanceKm: 1 }]);
-
-      await processor.process(makeJob({ attemptsMade: 2 }));
-
-      // Only the assignment transaction, not a second CONFIRMED->SEARCHING one.
-      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('process — failure / edge paths', () => {
-    it('throws (to trigger a BullMQ retry) when no driver is nearby', async () => {
-      drivers.findNearby.mockResolvedValue([]);
-
-      await expect(processor.process(makeJob())).rejects.toThrow(/No available drivers/);
-    });
-
-    it('drops the job quietly if the delivery no longer exists', async () => {
-      prisma.delivery.findUnique.mockResolvedValue(null);
 
       await expect(processor.process(makeJob())).resolves.toBeUndefined();
-      expect(drivers.findNearby).not.toHaveBeenCalled();
+
+      expect(assignmentService.assignDriver).toHaveBeenCalledWith('delivery-1');
     });
 
-    it('skips assignment if the delivery already moved past the assignable window (e.g. cancelled)', async () => {
-      prisma.delivery.findUnique.mockResolvedValue({ ...baseDelivery, status: 'CANCELLED' });
+    it('propagates assignment errors so BullMQ can retry the job', async () => {
+      assignmentService.assignDriver.mockRejectedValue(
+        new Error('No available drivers within 5km of pickup'),
+      );
 
-      await processor.process(makeJob());
+      await expect(processor.process(makeJob())).rejects.toThrow(
+        /No available drivers/,
+      );
 
-      expect(drivers.findNearby).not.toHaveBeenCalled();
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-    });
-
-    it('propagates a Redis/nearby-query failure so BullMQ can retry it', async () => {
-      drivers.findNearby.mockRejectedValue(new Error('Unable to search for nearby drivers'));
-
-      await expect(processor.process(makeJob())).rejects.toThrow(/Unable to search/);
+      expect(assignmentService.assignDriver).toHaveBeenCalledWith('delivery-1');
     });
   });
 
   describe('onFailed', () => {
-    it('does not touch the delivery while retries remain', async () => {
+    it('does not mark the delivery FAILED while retries remain', async () => {
       await processor.onFailed(
-        makeJob({ attemptsMade: 2, opts: { attempts: 5 } }),
+        makeJob({
+          attemptsMade: 2,
+          opts: { attempts: 5 },
+        }),
         new Error('no drivers'),
       );
 
-      expect(prisma.delivery.findUnique).not.toHaveBeenCalled();
+      expect(assignmentService.markFailed).not.toHaveBeenCalled();
     });
 
     it('marks the delivery FAILED once the final attempt is exhausted', async () => {
-      prisma.delivery.findUnique.mockResolvedValue({
-        ...baseDelivery,
-        status: 'SEARCHING_FOR_DRIVER',
-      });
-
       await processor.onFailed(
-        makeJob({ attemptsMade: 5, opts: { attempts: 5 } }),
+        makeJob({
+          attemptsMade: 5,
+          opts: { attempts: 5 },
+        }),
         new Error('no drivers'),
       );
 
-      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(lastTx!.delivery.update).toHaveBeenCalledWith({
-        where: { id: 'delivery-1' },
-        data: { status: 'FAILED' },
-      });
-    });
-
-    it('does not clobber a delivery that already moved on before the final failure was handled', async () => {
-      prisma.delivery.findUnique.mockResolvedValue({ ...baseDelivery, status: 'CANCELLED' });
-
-      await processor.onFailed(
-        makeJob({ attemptsMade: 5, opts: { attempts: 5 } }),
-        new Error('no drivers'),
+      expect(assignmentService.markFailed).toHaveBeenCalledWith(
+        'delivery-1',
+        'no drivers',
       );
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(assignmentService.markFailed).toHaveBeenCalledTimes(1);
     });
 
-    it('ignores a failed event with no job (BullMQ can emit this)', async () => {
-      await expect(processor.onFailed(undefined, new Error('x'))).resolves.toBeUndefined();
+    it('uses the configured attempt count when deciding whether to fail', async () => {
+      await processor.onFailed(
+        makeJob({
+          attemptsMade: 3,
+          opts: { attempts: 3 },
+        }),
+        new Error('assignment failed'),
+      );
+
+      expect(assignmentService.markFailed).toHaveBeenCalledWith(
+        'delivery-1',
+        'assignment failed',
+      );
+    });
+
+    it('does not clobber the delivery while retries remain', async () => {
+      await processor.onFailed(
+        makeJob({
+          attemptsMade: 4,
+          opts: { attempts: 5 },
+        }),
+        new Error('temporary failure'),
+      );
+
+      expect(assignmentService.markFailed).not.toHaveBeenCalled();
+    });
+
+    it('ignores a failed event with no job', async () => {
+      await expect(
+        processor.onFailed(undefined, new Error('x')),
+      ).resolves.toBeUndefined();
+
+      expect(assignmentService.markFailed).not.toHaveBeenCalled();
     });
   });
 });

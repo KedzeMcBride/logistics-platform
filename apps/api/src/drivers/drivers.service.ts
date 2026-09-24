@@ -207,9 +207,16 @@ export class DriversService {
    * being returned. A driver dropped by that check simply doesn't appear in
    * the results; it isn't an error.
    */
+
+  
   async findNearby(query: NearbyDriversQueryDto) {
     const radiusKm = query.radiusKm ?? 5;
     const limit = query.limit ?? 20;
+    const excludeDriverIds = query.excludeDriverIds ?? [];
+
+    // Ask Redis for additional candidates so excluded drivers do not consume
+    // the entire requested result set.
+    const redisLimit = Math.min(50, limit + excludeDriverIds.length);
 
     let matches: NearbyMatch[];
     try {
@@ -223,7 +230,7 @@ export class DriversService {
         'km',
         'ASC',
         'COUNT',
-        limit,
+        redisLimit,
         'WITHCOORD',
         'WITHDIST',
       );
@@ -234,23 +241,36 @@ export class DriversService {
 
     if (matches.length === 0) return [];
 
+    const excluded = new Set(excludeDriverIds);
+
+    const eligibleMatches = matches
+      .filter((match) => !excluded.has(match.driverId))
+      .slice(0, limit);
+
+    if (eligibleMatches.length === 0) return [];
+
     const drivers = await this.prisma.driverProfile.findMany({
       where: {
-        id: { in: matches.map((m) => m.driverId) },
+        id: {
+          in: eligibleMatches.map((m) => m.driverId),
+          ...(excludeDriverIds.length > 0 ? { notIn: excludeDriverIds } : {}),
+        },
         availability: 'ONLINE',
       },
       include: {
         vehicles: { where: { isActive: true } },
       },
     });
+
     const driverById = new Map(drivers.map((driver) => [driver.id, driver]));
 
-    // `matches` is already nearest-first from GEOSEARCH ASC; filtering
-    // preserves that order.
-    return matches
+    // `eligibleMatches` is already nearest-first from GEOSEARCH ASC;
+    // filtering preserves that order.
+    return eligibleMatches
       .filter((match) => driverById.has(match.driverId))
       .map((match) => {
         const driver = driverById.get(match.driverId)!;
+
         return {
           driverId: driver.id,
           fullName: driver.fullName,
@@ -266,6 +286,7 @@ export class DriversService {
         };
       });
   }
+
 
   private parseGeosearchResults(raw: unknown): NearbyMatch[] {
     if (!Array.isArray(raw)) return [];
