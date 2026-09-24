@@ -299,9 +299,7 @@ export class AssignmentService {
     await this.prisma.delivery.update({
       where: { id: deliveryId },
       data: {
-        excludedDriverIds: {
-          push: driverId,
-        },
+        excludedDriverIds: [...excludedDriverIds, driverId],
       },
     });
   }

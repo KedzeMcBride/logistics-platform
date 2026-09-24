@@ -1741,458 +1741,255 @@ Proceed to the next roadmap day using the existing AssignmentService and Assignm
 
 # Day 16 Progress — Driver Assignment Timeout & Rejection Handling
 
+**Target date:** Saturday, 26 September 2026
+
+**Roadmap Day:** 23
+
+**Daily goal:** Accept / Reject / Timeout
+
 ## Objective
 
-Implement and stabilize the driver assignment timeout and rejection workflow so that:
+Implement and verify the complete driver response lifecycle for delivery assignments:
 
+- Drivers can accept assignments.
 - Drivers can reject assignments.
-- Drivers who do not respond before the deadline are timed out.
-- Rejected/timed-out drivers are excluded from future assignment attempts.
-- Deliveries can be reassigned to another eligible driver.
-- Deliveries are marked as failed when no eligible driver remains.
-- Assignment logic is centralized in `AssignmentService`.
-- BullMQ handles delayed driver response timeout jobs.
+- Drivers who do not respond before the response deadline are timed out.
+- Rejected and timed-out drivers are excluded from subsequent assignment attempts.
+- Deliveries are reassigned when another eligible driver is available.
+- Deliveries are marked `FAILED` when no eligible driver remains.
+- Assignment logic remains centralized in `AssignmentService`.
+- BullMQ handles delayed assignment-response timeout processing.
 
 ---
 
-## 1. Prisma / Database Updates
+## Implementation Completed
 
-### Existing Assignment Fields
+### 1. Assignment Attempt Tracking
 
-Confirmed that the `Delivery` model already contains:
+Implemented assignment attempt tracking using `assignmentAttempts`.
 
-```prisma
-assignmentAttempts      Int      @default(0)
-driverResponseDeadline  DateTime?
-driverRespondedAt       DateTime?
-```
+Each assignment attempt increments the delivery's attempt count.
 
-These fields are used to track:
+**Status:** ✅ Complete
 
-- Number of assignment attempts.
-- Driver response deadline.
-- Whether the driver has responded.
+### 2. Driver Response Deadline
 
-### Added Driver Exclusion
+Each `DRIVER_ASSIGNED` delivery receives a response deadline.
 
-Added:
-
-```prisma
-excludedDriverIds Json @default("[]")
-```
-
-This stores the IDs of drivers who have already rejected or timed out on the delivery.
-
-### Migration
-
-Created and applied:
+The current response window is:
 
 ```text
-20260924142536_add_delivery_excluded_driver_ids
+60 seconds
 ```
 
-Prisma Client was regenerated successfully.
-
----
-
-## 2. Prisma Verification
-
-Successfully ran:
-
-```powershell
-pnpm --filter @repo/database db:generate
-```
-
-Result:
+The deadline is stored in:
 
 ```text
-Prisma Client v5.22.0 generated successfully
+driverResponseDeadline
 ```
 
-Schema validation:
+**Status:** ✅ Complete
 
-```powershell
-pnpm --filter @repo/database exec prisma validate
-```
+### 3. Driver Acceptance
 
-Result:
+Drivers can accept an assignment through:
 
 ```text
-Prisma schema is valid
+PATCH /api/v1/deliveries/:id/accept
 ```
 
----
+Acceptance validates:
 
-## 3. Nearby Driver Exclusion
+- Driver authentication.
+- Driver ownership of the assignment.
+- Current delivery status.
+- Response deadline.
 
-Updated:
+A successful acceptance transitions:
 
 ```text
-apps/api/src/drivers/dto/nearby-drivers-query.dto.ts
+DRIVER_ASSIGNED -> DRIVER_ACCEPTED
 ```
 
-Added support for:
+The response timestamp is recorded in:
+
+```text
+driverRespondedAt
+```
+
+**Status:** ✅ Complete
+
+### 4. Driver Rejection
+
+Drivers can reject an assignment through:
+
+```text
+PATCH /api/v1/deliveries/:id/reject
+```
+
+Optional rejection reason is accepted through `RejectAssignmentDto`.
+
+A rejection:
+
+1. Verifies driver ownership.
+2. Adds the driver to `excludedDriverIds`.
+3. Clears the current assignment.
+4. Returns the delivery to searching.
+5. Attempts reassignment.
+6. Marks the delivery `FAILED` if no eligible driver remains.
+
+**Status:** ✅ Complete
+
+### 5. Rejected Driver Exclusion
+
+During runtime verification, a persistence issue was discovered in `excludeDriver()`.
+
+The previous implementation used Prisma JSON `push` syntax:
 
 ```ts
-excludeDriverIds?: string[]
+excludedDriverIds: {
+  push: driverId,
+},
 ```
 
-with UUID validation.
+This did not persist the driver ID correctly for the application's JSON field.
 
-### `DriversService.findNearby()`
-
-Updated driver discovery to:
-
-1. Receive excluded driver IDs.
-2. Request additional Redis GEO results when exclusions exist.
-3. Remove excluded drivers.
-4. Query Prisma for eligible drivers.
-5. Apply `notIn` filtering.
-6. Return eligible online drivers.
-
-This prevents the same driver from being immediately selected again after rejecting or timing out.
-
----
-
-## 4. AssignmentService Centralization
-
-Updated:
-
-```text
-apps/api/src/assignment/assignment.service.ts
-```
-
-Assignment behavior was centralized in `AssignmentService`.
-
-The service now handles:
-
-- Driver discovery.
-- Driver selection.
-- Vehicle capacity validation.
-- Assignment attempt tracking.
-- Driver exclusions.
-- Driver response deadlines.
-- Driver acceptance.
-- Driver rejection.
-- Driver timeout.
-- Reassignment.
-- Delivery failure.
-
-This removed duplicated assignment logic from the queue processor.
-
----
-
-## 5. Vehicle Capacity Check
-
-Driver selection now checks whether the driver's active vehicle can carry the delivery.
-
-A driver is eligible when:
-
-- The driver is available.
-- The driver is not excluded.
-- The vehicle has enough capacity.
-- Or the vehicle has no specified capacity.
-
-This prevents unsuitable vehicles from being assigned deliveries.
-
----
-
-## 6. Assignment Attempts
-
-Assignment attempts are tracked through:
-
-```prisma
-assignmentAttempts
-```
-
-Each new assignment attempt increments the counter.
-
-The attempt number is also passed to the timeout queue so that timeout jobs can be associated with the correct assignment attempt.
-
----
-
-## 7. Driver Response Deadline
-
-When a driver is assigned, the delivery receives:
+The implementation was corrected to:
 
 ```ts
-driverResponseDeadline;
+excludedDriverIds: [...excludedDriverIds, driverId],
 ```
 
-The deadline is calculated using:
+This was verified using a fresh runtime rejection test.
 
-```ts
-ASSIGNMENT_RESPONSE_TIMEOUT_MS;
-```
+**Status:** ✅ Complete
 
-The assignment also resets:
+### 6. Nearby Driver Exclusion
 
-```ts
-driverRespondedAt: null;
-```
+Assignment searches exclude drivers already contained in `excludedDriverIds`.
 
-This gives every driver a defined period to accept or reject the delivery.
+This prevents a driver who has rejected or timed out from immediately receiving the same delivery again.
 
----
+**Status:** ✅ Complete
 
-## 8. Assignment Queue
+### 7. Vehicle Capacity Validation
 
-Updated:
+Driver assignment continues to respect active vehicle capacity.
+
+A driver is only selected when an active vehicle can carry the delivery package.
+
+**Status:** ✅ Complete
+
+### 8. Assignment Timeout Queue
+
+A dedicated BullMQ timeout queue was implemented:
 
 ```text
-apps/api/src/queue/assignment-queue.service.ts
+driver-assignment-timeout
 ```
 
-The queue service now supports:
+Timeout jobs use the assignment delivery ID and assignment attempt number.
 
-```ts
-enqueueAssignment();
-scheduleResponseTimeout();
-cancelResponseTimeout();
-isHealthy();
-```
+Timeout jobs are scheduled when a driver is assigned.
 
-A dedicated timeout queue was introduced:
+**Status:** ✅ Complete
+
+### 9. Assignment Timeout Processor
+
+`AssignmentTimeoutProcessor` processes delayed timeout jobs.
+
+Before timing out an assignment, it re-checks the current delivery state.
+
+The processor skips stale timeout jobs when:
+
+- The delivery no longer exists.
+- The driver has already responded.
+- The delivery is no longer `DRIVER_ASSIGNED`.
+- The delivery is assigned to a different driver.
+- The response deadline has not actually expired.
+
+**Status:** ✅ Complete
+
+### 10. Timeout Handling
+
+When the response deadline expires:
 
 ```text
-ASSIGNMENT_TIMEOUT_QUEUE_NAME
-```
-
-Timeout jobs contain:
-
-```ts
-{
-  (deliveryId, driverId, attempt);
-}
-```
-
-A deterministic job ID is generated from the delivery and assignment attempt.
-
----
-
-## 9. Assignment Processor
-
-Updated:
-
-```text
-apps/api/src/queue/assignment.processor.ts
-```
-
-The processor was simplified so that it delegates the actual assignment work to:
-
-```ts
-AssignmentService;
-```
-
-Instead of maintaining a second copy of assignment logic.
-
-This creates a cleaner architecture:
-
-```text
-BullMQ
-   ↓
-AssignmentProcessor
-   ↓
-AssignmentService
-   ↓
-Driver selection / assignment
-```
-
----
-
-## 10. Assignment Timeout Processor
-
-Implemented:
-
-```text
-apps/api/src/queue/assignment-timeout.processor.ts
-```
-
-The processor verifies:
-
-### Delivery exists
-
-If the delivery no longer exists, the job is skipped.
-
-### Driver has not responded
-
-If:
-
-```ts
-driverRespondedAt;
-```
-
-already exists, the timeout job does nothing.
-
-### Driver is still assigned
-
-The processor verifies that:
-
-```text
-delivery.status === DRIVER_ASSIGNED
-```
-
-and that the delivery is still assigned to the same driver.
-
-### Deadline has expired
-
-The processor verifies:
-
-```ts
-driverResponseDeadline <= new Date();
-```
-
-before processing the timeout.
-
-If all conditions are satisfied:
-
-```text
-AssignmentTimeoutProcessor
+DRIVER_ASSIGNED
         ↓
-AssignmentService.handleTimeout()
-```
-
----
-
-## 11. Timeout Handling
-
-When a driver times out:
-
-```text
-DRIVER_ASSIGNED
-       ↓
 Response deadline expires
-       ↓
-Timeout job executes
-       ↓
-handleTimeout()
-       ↓
-Driver added to excludedDriverIds
-       ↓
-Delivery returns to SEARCHING_FOR_DRIVER
-       ↓
-Search for another driver
+        ↓
+Timeout processor
+        ↓
+Driver excluded
+        ↓
+Assignment cleared
+        ↓
+Reassignment attempted
 ```
 
-If another eligible driver exists, the delivery can be reassigned.
+If no eligible driver remains:
 
-If no eligible driver remains, the delivery can be marked as failed.
+```text
+FAILED
+```
+
+**Status:** ✅ Complete
+
+### 11. Assignment Processor
+
+Assignment processing remains centralized through `AssignmentService`.
+
+BullMQ workers invoke the service rather than duplicating assignment logic.
+
+**Status:** ✅ Complete
+
+### 12. Prisma Migration
+
+Driver response tracking fields were added through the Prisma migration:
+
+```text
+20260923125905_driver_response_tracking
+```
+
+Relevant fields include:
+
+```text
+assignmentAttempts
+driverResponseDeadline
+driverRespondedAt
+excludedDriverIds
+```
+
+**Status:** ✅ Complete
 
 ---
 
-## 12. Rejection Handling
+# API Routes
 
-Driver rejection now causes the driver to be excluded from subsequent assignment attempts.
-
-General flow:
+Driver assignment response routes:
 
 ```text
-DRIVER_ASSIGNED
-       ↓
-Driver rejects
-       ↓
-Driver added to excludedDriverIds
-       ↓
-Delivery returns to SEARCHING_FOR_DRIVER
-       ↓
-Find another eligible driver
+PATCH /api/v1/deliveries/:id/accept
+PATCH /api/v1/deliveries/:id/reject
 ```
 
-This prevents the rejected driver from immediately receiving the same delivery again.
+Both routes require:
+
+```text
+JWT authentication
+DRIVER role
+```
+
+**Status:** ✅ Complete
 
 ---
 
-## 13. Queue Module
+# Automated Verification
 
-Updated:
-
-```text
-apps/api/src/queue/queue.module.ts
-```
-
-Registered two queues:
+### API Typecheck
 
 ```text
-Assignment Queue
-Assignment Timeout Queue
-```
-
-The timeout queue uses a single attempt because timeout jobs are tied to a specific assignment attempt.
-
-`AssignmentQueueService` is exported globally so that `AssignmentService` can schedule timeout jobs without introducing an unnecessary circular module dependency.
-
----
-
-## 14. Assignment Module
-
-Updated:
-
-```text
-apps/api/src/assignment/assignment.module.ts
-```
-
-`AssignmentService` is provided and exported from the module.
-
-The module imports:
-
-```text
-DriversModule
-```
-
-The queue dependency is provided through the global `QueueModule`.
-
----
-
-# Testing & Verification
-
-## AssignmentService Tests
-
-Command:
-
-```powershell
-pnpm --filter @repo/api exec jest src/assignment/assignment.service.spec.ts --runInBand
-```
-
-Result:
-
-```text
-Test Suites: 1 passed, 1 total
-Tests:       13 passed, 13 total
-```
-
----
-
-## Full API Test Suite
-
-Command:
-
-```powershell
-pnpm --filter @repo/api exec jest --runInBand
-```
-
-Result:
-
-```text
-Test Suites: 10 passed, 10 total
-Tests:       96 passed, 96 total
-```
-
-### Final Test Status
-
-```text
-96 / 96 tests passing
-10 / 10 test suites passing
-```
-
-Expected error-path logs appeared during testing, including Redis connection errors and assignment retry logs. These were part of mocked/error-path tests and did not cause test failures.
-
----
-
-## API Typecheck
-
-Command:
-
-```powershell
 pnpm --filter @repo/api typecheck
 ```
 
@@ -2202,155 +1999,285 @@ Result:
 PASSED
 ```
 
----
+**Status:** ✅ Passed
 
-# Day 16 Architecture
-
-The completed Day 16 assignment flow is:
+### API Tests
 
 ```text
-              DELIVERY
-                  │
-                  ▼
-        Assignment Queue
-                  │
-                  ▼
-       Assignment Processor
-                  │
-                  ▼
-        AssignmentService
-                  │
-          Find nearby drivers
-                  │
-          Exclude previous
-             drivers
-                  │
-          Check capacity
-                  │
-                  ▼
-          DRIVER_ASSIGNED
-                  │
-                  ▼
-       Set response deadline
-                  │
-                  ▼
-        Schedule timeout job
-                  │
-                  ▼
-       Assignment Timeout Queue
-                  │
-             deadline
-              expires
-                  │
-                  ▼
-      AssignmentTimeoutProcessor
-                  │
-                  ▼
-          handleTimeout()
-                  │
-                  ▼
-        Exclude timed-out driver
-                  │
-                  ▼
-      SEARCHING_FOR_DRIVER
-                  │
-                  ▼
-          Reassignment
+pnpm --filter @repo/api test
 ```
+
+Result:
+
+```text
+10 suites passed
+96 tests passed
+0 snapshots
+```
+
+**Status:** ✅ Passed
+
+### API Build
+
+```text
+pnpm --filter @repo/api build
+```
+
+Result:
+
+```text
+nest build
+PASSED
+```
+
+**Status:** ✅ Passed
+
+### API Health
+
+Health endpoint:
+
+```text
+GET /api/v1/health
+```
+
+Verified:
+
+```text
+db=ok
+redis=ok
+queue=ok
+```
+
+**Status:** ✅ Passed
 
 ---
 
-# Day 16 Files Worked On
+# Runtime Verification
 
-### Database
+Runtime verification was performed against the running NestJS API with real PostgreSQL, Redis, and BullMQ infrastructure.
 
-```text
-packages/database/prisma/schema.prisma
-```
+## Accept Verification
 
-### Drivers
+Delivery:
 
 ```text
-apps/api/src/drivers/dto/nearby-drivers-query.dto.ts
-apps/api/src/drivers/drivers.service.ts
+ceb8bf33-61a1-4300-b146-f406dc939705
 ```
 
-### Assignment
+Observed:
+
+```text
+Assigned to approved online driver
+        ↓
+Driver accepted
+        ↓
+DRIVER_ACCEPTED
+```
+
+Final state:
+
+```text
+status = DRIVER_ACCEPTED
+driverRespondedAt = populated
+```
+
+The assignment remained accepted after the response.
+
+**Status:** ✅ Passed
+
+---
+
+## Reject Verification
+
+Fresh delivery:
+
+```text
+abc496fd-5ebd-469e-80d8-c00dabefe64a
+```
+
+Observed flow:
+
+```text
+PENDING
+    ↓
+CONFIRMED
+    ↓
+SEARCHING_FOR_DRIVER
+    ↓
+DRIVER_ASSIGNED
+    ↓
+Driver rejects
+    ↓
+Driver added to excludedDriverIds
+    ↓
+No eligible driver remains
+    ↓
+FAILED
+```
+
+Final runtime state:
+
+```text
+status = FAILED
+driverId = empty
+assignmentAttempts = 2
+excludedDriverIds = {rejected driver ID}
+```
+
+The rejected driver was successfully excluded from reassignment.
+
+**Status:** ✅ Passed
+
+---
+
+## Timeout Verification
+
+Fresh delivery:
+
+```text
+880dd061-3e5f-4a93-806e-dfd56ad37e7a
+```
+
+The delivery was assigned to the online driver with a 60-second response deadline.
+
+The driver did not accept or reject the assignment.
+
+Observed flow:
+
+```text
+DRIVER_ASSIGNED
+    ↓
+Response deadline expires
+    ↓
+AssignmentTimeoutProcessor
+    ↓
+Driver excluded
+    ↓
+Reassignment attempted
+    ↓
+No eligible driver remains
+    ↓
+FAILED
+```
+
+Final runtime state:
+
+```text
+status = FAILED
+driverId = empty
+assignmentAttempts = 2
+excludedDriverIds = {timed-out driver ID}
+driverResponseDeadline = empty
+driverRespondedAt = empty
+```
+
+Recorded response deadline:
+
+```text
+2026-09-24T17:19:06.763Z
+```
+
+Delivery updated to `FAILED` at:
+
+```text
+2026-09-24T17:19:06.982Z
+```
+
+This confirms the timeout processor executed after the deadline and handled the assignment correctly.
+
+**Status:** ✅ Passed
+
+---
+
+# Runtime Verification Checklist
+
+- [x] Real PostgreSQL connection verified
+- [x] Real Redis connection verified
+- [x] Real BullMQ assignment flow verified
+- [x] Driver assignment verified
+- [x] Driver acceptance verified
+- [x] Driver rejection verified
+- [x] Rejected-driver exclusion verified
+- [x] Assignment timeout verified
+- [x] Timed-out-driver exclusion verified
+- [x] Reassignment attempted after rejection
+- [x] Reassignment attempted after timeout
+- [x] Delivery failure verified when no eligible driver remained
+
+---
+
+# Definition of Done
+
+| Requirement                     | Status               |
+| ------------------------------- | -------------------- |
+| Assignment attempt tracking     | ✅ Passed            |
+| Driver response deadline        | ✅ Passed            |
+| Driver acceptance               | ✅ Passed            |
+| Driver rejection                | ✅ Passed            |
+| Driver exclusion                | ✅ Passed            |
+| Nearby-driver exclusion         | ✅ Passed            |
+| Vehicle capacity validation     | ✅ Passed            |
+| Timeout queue                   | ✅ Passed            |
+| Timeout processor               | ✅ Passed            |
+| Timeout handling                | ✅ Passed            |
+| Reassignment logic              | ✅ Passed            |
+| Failure handling                | ✅ Passed            |
+| Assignment processor            | ✅ Passed            |
+| Prisma migration                | ✅ Passed            |
+| API typecheck                   | ✅ Passed            |
+| API tests                       | ✅ 96/96 Passed      |
+| API build                       | ✅ Passed            |
+| API health                      | ✅ db/redis/queue OK |
+| Accept runtime test             | ✅ Passed            |
+| Reject runtime test             | ✅ Passed            |
+| Timeout runtime test            | ✅ Passed            |
+| End-to-end timeout verification | ✅ Passed            |
+
+---
+
+# Final Verification Summary
+
+```text
+API tests:             96/96 passed
+API typecheck:         PASSED
+API build:             PASSED
+API health:            db=ok, redis=ok, queue=ok
+
+Accept runtime:        PASSED
+Reject runtime:        PASSED
+Timeout runtime:       PASSED
+
+Git branch:            main
+```
+
+The only production-code change required during final runtime verification was:
 
 ```text
 apps/api/src/assignment/assignment.service.ts
-apps/api/src/assignment/assignment.module.ts
-apps/api/src/assignment/assignment.service.spec.ts
 ```
 
-### Queue
+The `excludedDriverIds` persistence was corrected from:
 
-```text
-apps/api/src/queue/assignment-queue.service.ts
-apps/api/src/queue/assignment-queue.service.spec.ts
-apps/api/src/queue/assignment.processor.ts
-apps/api/src/queue/assignment.processor.spec.ts
-apps/api/src/queue/assignment-timeout.processor.ts
-apps/api/src/queue/queue.module.ts
+```ts
+excludedDriverIds: {
+  push: driverId,
+},
 ```
+
+to:
+
+```ts
+excludedDriverIds: [...excludedDriverIds, driverId],
+```
+
+The correction was verified with a fresh rejection test and successfully prevented the rejected driver from being selected again.
 
 ---
 
-# Day 16 Completion Status
+# Day 16 Status
 
-| Task                           | Status      |
-| ------------------------------ | ----------- |
-| Assignment attempt tracking    | ✅ Complete |
-| Driver response deadline       | ✅ Complete |
-| Driver rejection handling      | ✅ Complete |
-| Driver exclusion               | ✅ Complete |
-| Nearby-driver exclusion        | ✅ Complete |
-| Vehicle capacity validation    | ✅ Complete |
-| Timeout queue                  | ✅ Complete |
-| Timeout processor              | ✅ Complete |
-| Timeout handling               | ✅ Complete |
-| Reassignment logic             | ✅ Complete |
-| Failure handling               | ✅ Complete |
-| Assignment processor refactor  | ✅ Complete |
-| Prisma migration               | ✅ Complete |
-| API typecheck                  | ✅ Passed   |
-| Assignment tests               | ✅ 13/13    |
-| Full API tests                 | ✅ 96/96    |
-| Real Redis/BullMQ runtime test | ⏳ Next     |
-| End-to-end timeout test        | ⏳ Next     |
+**Day 16 implementation and runtime verification status: COMPLETE.**
 
----
+All planned Accept / Reject / Timeout functionality has been implemented and verified against the running PostgreSQL, Redis, and BullMQ infrastructure.
 
-# Next Step
-
-The code and automated tests for Day 16 are passing.
-
-The next step is **runtime verification with real Redis/BullMQ**.
-
-The runtime test should confirm:
-
-```text
-Assignment
-   ↓
-Timeout job actually enters Redis
-   ↓
-Delay expires
-   ↓
-Timeout processor executes
-   ↓
-Driver is excluded
-   ↓
-Delivery returns to SEARCHING_FOR_DRIVER
-   ↓
-Another driver is assigned
-```
-
-The failure scenario should also be tested:
-
-```text
-No eligible drivers
-       ↓
-Delivery marked FAILED
-```
-
-**Day 16 implementation status: COMPLETE — runtime integration verification pending.**
+**Next step:** Create the Git checkpoint after the final `git diff --check`, status review, and verification commands pass.
